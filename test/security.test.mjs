@@ -40,3 +40,7 @@ test('Codex restrictions disable hooks, plugins, connectors and network', () => 
   const config = codexConfig('/tmp/synthetic-fixture', 'interview');
   assert.equal(config['features.plugins'], false); assert.equal(config['features.hooks'], false); assert.equal(config['features.apps'], false); assert.equal(config['permissions.relentless.network.enabled'], false); assert.equal(config['permissions.relentless.filesystem']['/tmp/synthetic-fixture'], 'read');
 });
+test('restart retains browser origin and rotates the local capability', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'relentless-restart-')); const first = await startServer({ root }); const { origin, token } = first; await first.close(); const second = await startServer({ root });
+  try { assert.equal(second.origin, origin); assert.notEqual(second.token, token); assert.equal((await fetch(origin + '/api/state', { headers: { Authorization: `Bearer ${token}` } })).status, 401); } finally { await second.close(); }
+});

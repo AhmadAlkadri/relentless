@@ -2,7 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
-import { Store, dataHome, Fault, hash, atomic, scopeHash } from './storage.mjs';
+import { Store, dataHome, Fault, hash, atomic, scopeHash, json } from './storage.mjs';
 import { Workspace } from './service.mjs';
 import { repo, protocol } from './protocol.mjs';
 
@@ -64,8 +64,12 @@ export async function startServer({ root = dataHome(), port = 0 } = {}) {
       respond(200, result);
     } catch (e) { if (!res.headersSent) respond(e.status || 500, { error: e.message }); else res.end(); }
   });
-  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', resolve); });
+  const listenerFile = path.join(store.root, 'listener.json');
+  const preferredPort = port || json(listenerFile, {}).port || 0;
+  try { await new Promise((resolve, reject) => { server.once('error', reject); server.listen(preferredPort, '127.0.0.1', resolve); }); }
+  catch (e) { fs.unlinkSync(lock); throw new Error(`Cannot bind the saved local port ${preferredPort}: ${e.code}. Stop the conflicting process or deliberately select a different port with relentless serve --port PORT.`); }
   origin = `http://127.0.0.1:${server.address().port}`;
+  atomic(listenerFile, JSON.stringify({ port: server.address().port }));
   const stateFile = path.join(store.root, 'server.json'); atomic(stateFile, JSON.stringify({ pid: process.pid, origin, token, root: store.root }));
   // Poll the actual Markdown inode, including replace/rename saves, to revoke a
   // running Build if its agreed scope is edited outside the browser.

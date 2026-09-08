@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="data:,">
+  <title>Relentless · A place to think</title>
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to conversation</a>
+  <div id="shell">
+    <aside id="sidebar" aria-label="Your workspace">
+      <a class="wordmark" href="/" id="home-link"><span class="brand-mark" aria-hidden="true">r.</span> relentless</a>
+      <p class="sidebar-note">Make room for the question.</p>
+      <button id="new-button" class="primary full">＋ New thought</button>
+      <div class="sidebar-heading"><h2>Worklist</h2><button id="import-button" class="text-button">Paste list</button></div>
+      <p id="worklist-empty" class="muted small">The things you want to think through, at your own pace.</p>
+      <div id="worklist"></div>
+      <div class="sidebar-heading"><h2>Sessions</h2><span id="session-count" class="muted small"></span></div>
+      <nav id="sessions" aria-label="Sessions"></nav>
+      <footer class="sidebar-footer"><span class="status-dot"></span><span id="connection">Connecting locally</span><button id="stop-button" class="text-button">Stop app</button></footer>
+    </aside>
+    <div id="workspace">
+      <header class="topbar">
+        <button id="nav-button" class="icon-button" aria-label="Toggle navigation" aria-expanded="false">☰</button>
+        <div id="mode-badge" class="badge">Local workspace</div>
+        <div class="topbar-actions">
+          <button id="context-button" aria-expanded="false" aria-controls="context-panel">Context</button>
+          <button id="focus-button" aria-pressed="false">Focus</button>
+          <button id="display-button" aria-label="Reading preferences">Aa</button>
+        </div>
+      </header>
+      <div id="notice" role="status" aria-live="polite" hidden></div>
+      <main id="main" tabindex="-1">
+        <section id="welcome">
+          <p class="eyebrow">YOUR LOCAL THINKING SPACE</p>
+          <h1>A little room for<br>a bigger thought.</h1>
+          <p>Explore the project. Find what matters.<br>Decide when it is time to make it real.</p>
+          <button id="welcome-new" class="primary">Start a conversation <span aria-hidden="true">↗</span></button>
+          <div class="welcome-footnote"><span class="rule"></span>Real Markdown. Deliberate next steps. Yours.</div>
+        </section>
+        <section id="session-view" hidden>
+          <div class="session-heading">
+            <p id="session-kicker" class="eyebrow">THINKING TOGETHER</p>
+            <h1 id="session-title"></h1>
+            <p id="session-target" class="muted small"></p>
+            <p class="privacy-note">This is a separate app-owned conversation. Saved public context and submitted answers go to the selected provider. Drafts and private scratchpad stay local.</p>
+          </div>
+          <div id="session-alert" class="callout" hidden></div>
+          <div id="recovery-actions" class="button-row" hidden>
+            <button id="recovery-button">Recovered text</button><button id="reconcile-button">Check provider state</button><button id="acknowledge-button">Acknowledge interrupted request</button>
+          </div>
+          <div class="control-bar" aria-label="Deliberate session controls">
+            <button id="interview-button">Start interview</button>
+            <button id="summary-button">Where are we?</button>
+            <button id="print-button">Print</button>
+            <button id="tune-button">/tune</button>
+            <button id="pause-button" hidden>Pause</button>
+          </div>
+          <div class="conversation-layout">
+            <div class="writing-column">
+              <article id="conversation" class="markdown" aria-label="Conversation"></article>
+              <article id="stream" class="markdown stream" aria-label="Current response" hidden></article>
+              <p id="thinking" class="thinking" role="status" hidden><span class="status-dot"></span><span id="thinking-text">Thinking with you…</span></p>
+              <section id="pending" aria-label="Agent question or tool approval" hidden></section>
+              <section id="composer" class="composer">
+                <div class="editor-heading"><label for="editor-draft">Your space to answer</label><span id="save-draft" class="save-status">Saved locally</span></div>
+                <textarea id="editor-draft" data-section="draft" rows="6" placeholder="Follow the thought. A rough answer, a question back, or “help me think through this” all belong here."></textarea>
+                <div id="conflict-draft" class="conflict" hidden></div>
+                <div class="composer-footer"><span class="small muted">Markdown welcome · ⌘ Enter to continue</span><div class="button-row"><button id="save-draft-button" data-save="draft">Save draft</button><button id="continue-button" class="primary">Continue <span aria-hidden="true">↗</span></button></div></div>
+                <label class="checkbox-line"><input id="use-preferences" type="checkbox"> Include my saved collaboration preferences in this turn</label>
+                <p class="small muted">Continue sends this answer with saved public context. It does not save unsent context edits or authorize implementation.</p>
+              </section>
+              <details id="build-details" class="build-details"><summary>Ready to make it real?</summary><p>Build authorizes the saved scope below for one execution turn. New scope needs new authority. The packet uses saved brief, decisions, facts, assumptions, and questions. Conversation, drafts, and scratchpad are excluded.</p><dl><dt>Target</dt><dd id="build-target"></dd><dt>Saved scope</dt><dd id="build-scope" class="markdown"></dd><dt>Permissions</dt><dd>Normal tool approvals. No deployment, publishing, pushes, spending, destructive work, or shared configuration changes.</dd></dl><p id="build-unsaved" class="small"></p><button id="build-button" class="primary">Build agreed scope</button></details>
+              <section id="tune-review" hidden><div class="section-heading"><h2>Tune the experience</h2><span id="tune-version" class="small muted"></span></div><p class="muted">Review one change at a time. Nothing becomes a reusable rule without your acceptance.</p><div id="tune-proposals"></div></section>
+              <details class="document-details"><summary>The real Markdown file</summary><p id="document-path" class="file-path"></p><p class="small muted">Open this file in any editor. Keep its section markers. Saved external edits appear here; Continue is always explicit.</p><div class="button-row"><button id="copy-path-button">Copy path</button><button id="raw-toggle-button">Edit full Markdown</button><button id="export-button">ChatGPT / context export</button></div><div id="raw-editor-container" hidden><label for="editor-raw">Canonical session document</label><textarea id="editor-raw" data-section="raw" rows="22" spellcheck="false"></textarea><span id="save-raw" class="save-status"></span><div id="conflict-raw" class="conflict" hidden></div><button data-save="raw">Save Markdown</button></div></details>
+            </div>
+            <aside id="context-panel" aria-label="Saved project context" hidden>
+              <div class="section-heading"><h2>The shape of things</h2><button id="close-context" class="icon-button" aria-label="Close context">×</button></div>
+              <p class="small muted">Saved public context informs the next turn. Suggestions are yours to revise or accept.</p>
+              <div id="context-editors"></div>
+              <div id="suggestions" hidden></div>
+              <p id="protocol-info" class="small muted"></p>
+            </aside>
+          </div>
+        </section>
+      </main>
+      <footer class="workspace-footer"><span>Think freely. Move deliberately.</span><span id="workspace-state">Private local storage</span></footer>
+    </div>
+  </div>
+  <dialog id="modal"><div class="modal-heading"><h2 id="modal-title"></h2><button id="modal-close" class="icon-button" aria-label="Close dialog">×</button></div><div id="modal-content"></div></dialog>
+</body>
+</html>

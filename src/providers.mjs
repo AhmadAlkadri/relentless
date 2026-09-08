@@ -111,6 +111,7 @@ export function safeClaudePath(cwd, input) {
 }
 export async function runClaude(opts) {
   const { cwd, mode, prompt, system, providerId, emit, interact, signal, saveId } = opts;
+  const staging = path.join(cwd, '.claude', '.cc-writes'), hadStaging = fs.existsSync(staging), hadClaudeDir = fs.existsSync(path.dirname(staging));
   const read = ['Read', 'Glob', 'Grep']; const allowed = [...read, 'AskUserQuestion', ...(mode === 'build' ? ['Write', 'Edit', 'Bash'] : [])];
   let output = '', sessionId = providerId, q;
   const hook = async h => {
@@ -153,7 +154,16 @@ export async function runClaude(opts) {
       if (m.type === 'result') { if (m.is_error) throw new Error(m.result || m.errors?.join('; ') || m.subtype); if (m.result && !output) { output = m.result; emit({ type: 'delta', text: output }); } }
     }
     return { text: output, providerId: sessionId };
-  } finally { q.close(); }
+  } finally {
+    q.close();
+    // The installed restricted writer creates an empty private staging directory.
+    // Remove only newly created, empty runtime directories, never existing data.
+    if (mode === 'build') {
+      for (const [dir, existed] of [[staging, hadStaging], [path.dirname(staging), hadClaudeDir]]) {
+        if (!existed) try { if (fs.lstatSync(dir).isDirectory() && !fs.lstatSync(dir).isSymbolicLink() && fs.readdirSync(dir).length === 0) fs.rmdirSync(dir); } catch {}
+      }
+    }
+  }
 }
 
 export async function runMock(opts) {

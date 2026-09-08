@@ -9,7 +9,20 @@ import { providers, CodexRPC } from './providers.mjs';
 export class Workspace {
   constructor(store) { this.store = store; this.active = null; this.listeners = new Set(); store.recover(); }
   event(id, event) { for (const send of this.listeners) send({ session: id, ...event }); }
-  view(id) { const s = this.store.read(id); return { ...s, active: this.active?.id === id ? { text: this.active.text, pending: this.active.pending?.display } : null, currentProtocol: protocol().version }; }
+  view(id) {
+    const s = this.store.read(id), conversation = s.values?.conversation || '';
+    const stateBlocks = [...conversation.matchAll(/```relentless-state\s*\n([\s\S]*?)\n```/g)];
+    try { s.meta.suggestion = stateBlocks.length ? JSON.parse(stateBlocks.at(-1)[1]) : null; } catch { s.meta.suggestion = null; }
+    if (s.meta.tune) {
+      const blocks = [...conversation.matchAll(/```relentless-tune\s*\n([\s\S]*?)\n```/g)];
+      try {
+        const proposals = JSON.parse(blocks.at(-1)?.[1] || '[]');
+        const accepted = Object.fromEntries([...conversation.matchAll(/```relentless-accepted\s*\n([\s\S]*?)\n```/g)].map(x => { const a = JSON.parse(x[1]); return [a.id, a]; }));
+        s.meta.tune.proposals = s.meta.tune.proposals.map((p, i) => ({ ...proposals[i], ...p, ...(accepted[p.id] || {}) }));
+      } catch { s.meta.tune.proposals = []; }
+    }
+    return { ...s, active: this.active?.id === id ? { text: this.active.text, pending: this.active.pending?.display } : null, currentProtocol: protocol().version };
+  }
   async begin(id, { action = 'continue', revision, text = '', requestId, scope, usePreferences = false }) {
     if (!/^[a-f0-9-]{36}$/.test(requestId || '')) throw new Fault('A unique request identifier is required.');
     let s = this.store.read(id);
@@ -62,7 +75,8 @@ export class Workspace {
     };
     active.done = (async () => {
       try {
-        const result = await providers[m.backend]({ cwd: m.project || path.join(this.store.root, 'empty-project'), mode, prompt, system: instructions(p, mode), providerId: m.providers[providerKey]?.id, controller, signal: controller.signal, emit, interact,
+        const system = instructions(p, mode) + (action === 'tune' ? '\n\nCanonical Tune instructions:\n' + fs.readFileSync(path.join(repo, 'skills/tune/SKILL.md'), 'utf8') : '');
+        const result = await providers[m.backend]({ cwd: m.project || path.join(this.store.root, 'empty-project'), mode, prompt, system, providerId: m.providers[providerKey]?.id, controller, signal: controller.signal, emit, interact,
           saveId: async (providerId, capabilities) => { const meta = this.store.meta(id); meta.providers[providerKey] = { id: providerId, protocol: p.version, ...capabilities }; this.store.setMeta(id, meta); }
         });
         const parsed = parseReply(result.text);
@@ -73,10 +87,12 @@ export class Workspace {
           const match = result.text.match(/```relentless-tune\s*\n([\s\S]*?)\n```/);
           let proposals = [];
           try { if (match) proposals = JSON.parse(match[1]); } catch { /* Review remains readable in Markdown. */ }
-          meta.tune = { version: p.version, preferenceVersion: this.preferences().version, proposals: Array.isArray(proposals) ? proposals.slice(0, 3).map(x => ({ ...x, id: randomUUID(), status: 'proposed' })) : [] };
+          meta.tune = { version: p.version, preferenceVersion: this.preferences().version, sourceHash: match ? hash(match[1]) : null, proposals: Array.isArray(proposals) ? proposals.slice(0, 3).map(() => ({ id: randomUUID(), status: 'proposed' })) : [] };
         }
-        meta.suggestion = parsed.suggestion; this.store.setMeta(id, meta);
-        this.store.append(id, action === 'tune' ? 'Tune review' : mode === 'build' ? 'Execution' : 'Relentless', parsed.text || 'The provider returned no text.');
+        delete meta.suggestion; this.store.setMeta(id, meta);
+        // Provider state proposals remain in readable Markdown; the view derives
+        // their cards from those blocks. Sidecars keep only review identifiers.
+        this.store.append(id, action === 'tune' ? 'Tune review' : mode === 'build' ? 'Execution' : 'Relentless', result.text || 'The provider returned no text.');
         const final = this.store.meta(id); final.status = controller.signal.aborted ? 'paused' : 'idle'; final.mode = 'interview'; final.pending = null; final.request.completed = new Date().toISOString(); this.store.setMeta(id, final);
       } catch (error) {
         const meta = this.store.meta(id); meta.status = controller.signal.aborted ? 'paused' : 'uncertain'; meta.error = error.message; meta.mode = 'interview'; meta.pending = null; this.store.setMeta(id, meta);
@@ -94,7 +110,11 @@ export class Workspace {
       if (!answers || typeof answers !== 'object' || !Object.values(answers).every(x => typeof x === 'string')) throw new Fault('Provide free-text answers.');
       this.store.append(id, 'You', Object.values(answers).join('\n\n'));
     }
-    if (kind === 'approval' && a.mode !== 'build') throw new Fault('Interview mode cannot approve execution.');
+    if (kind === 'approval') {
+      if (a.mode !== 'build') throw new Fault('Interview mode cannot approve execution.');
+      const current = this.store.read(id);
+      if (!current.values || scopeHash(current.values, current.meta.project) !== a.scope) { this.pause(id); throw new Fault('Execution scope changed while approval was pending. Rejected and paused.', 409); }
+    }
     a.pending = null;
     const m = this.store.meta(id); m.status = 'running'; m.pending = null; this.store.setMeta(id, m);
     pending.resolve({ answers, allow: allow === true }); return { accepted: true };
@@ -118,10 +138,15 @@ export class Workspace {
   preferences() { const p = json(path.join(this.store.root, 'preferences.json'), { text: '' }); return { ...p, version: hash(p.text) }; }
   tuneDecision(id, { proposalId, decision, after, version }) {
     if (this.active) throw new Fault('Pause active generation before applying tuning.', 409);
-    const s = this.store.read(id), tune = s.meta.tune, proposal = tune?.proposals.find(x => x.id === proposalId);
+    const s = this.store.read(id), tune = s.meta.tune, record = tune?.proposals.find(x => x.id === proposalId);
+    const blocks = [...(s.values?.conversation || '').matchAll(/```relentless-tune\s*\n([\s\S]*?)\n```/g)];
+    const block = blocks.at(-1);
+    if (!block || !tune?.sourceHash || hash(block[1]) !== tune.sourceHash) throw new Fault('The reviewed proposal text changed in Markdown. Run Tune again to revalidate.', 409);
+    let proposals; try { proposals = JSON.parse(block[1]); } catch { throw new Fault('Invalid proposal JSON. Preserve the text and review again.'); }
+    const index = tune.proposals.indexOf(record), proposal = record ? { ...proposals[index], ...record } : null;
     if (!proposal || !['proposed', 'deferred'].includes(proposal.status)) throw new Fault('Proposal is no longer awaiting review.', 409);
     if (!['accept', 'reject', 'defer'].includes(decision)) throw new Fault('Invalid review action.');
-    if (decision !== 'accept') { proposal.status = decision === 'reject' ? 'rejected' : 'deferred'; this.store.setMeta(id, s.meta); return proposal; }
+    if (decision !== 'accept') { record.status = decision === 'reject' ? 'rejected' : 'deferred'; this.store.setMeta(id, s.meta); return { ...proposal, ...record }; }
     if (typeof after === 'string') proposal.after = after;
     if (typeof proposal.after !== 'string' || proposal.after.length > 20000) throw new Fault('Provide a concrete bounded replacement.');
     if (proposal.scope === 'method') {
@@ -134,7 +159,7 @@ export class Workspace {
       if (!candidate.startsWith('---\n') || candidate.length < 1200 || candidate.includes('\u2014')) throw new Fault('Patch failed method formatting checks.');
       const full = path.join(repo, target); atomic(full, candidate);
       try { execFileSync(process.execPath, ['scripts/check.mjs'], { cwd: repo, stdio: 'pipe' }); execFileSync(process.execPath, ['--test', 'test/protocol.test.mjs'], { cwd: repo, stdio: 'pipe' }); execFileSync('git', ['add', '--', target], { cwd: repo }); execFileSync('git', ['commit', '--only', '-m', 'refine: apply reviewed Relentless method tuning', '--', target], { cwd: repo }); }
-      catch (e) { atomic(full, p.text); throw new Fault('Regression checks or commit failed. Original method restored; inspect Git before retrying.', 409); }
+      catch (e) { atomic(full, p.text); try { execFileSync('git', ['add', '--', target], { cwd: repo }); } catch {} throw new Fault('Regression checks or commit failed. Original method restored; inspect Git before retrying.', 409); }
       proposal.commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim(); proposal.rollback = 'Use the reviewed inverse patch through Tune; no automatic history rewrite.';
     } else if (proposal.scope === 'preference') {
       const old = this.preferences(); if (tune.preferenceVersion !== old.version) throw new Fault('Personal preferences changed; review again.', 409);
@@ -144,7 +169,11 @@ export class Workspace {
       this.store.update(id, 'decisions', `${s.values.decisions}\n\n${proposal.after}`.trim(), s.revision);
     } else if (proposal.scope === 'interface') { proposal.implementationPrompt = `Implement this explicitly reviewed interface change in Relentless using focused commits and browser verification. No deployment or push.\n\n${proposal.after}`; }
     else throw new Fault('Unknown tuning scope.');
-    proposal.status = 'accepted'; this.store.setMeta(id, s.meta); return proposal;
+    record.status = 'accepted'; if (proposal.commit) record.commit = proposal.commit;
+    this.store.setMeta(id, s.meta);
+    const accepted = { id: proposal.id, scope: proposal.scope, after: proposal.after, ...(proposal.commit ? { commit: proposal.commit } : {}), ...(proposal.implementationPrompt ? { implementationPrompt: proposal.implementationPrompt } : {}) };
+    this.store.append(id, 'Approved Tune decision', `Scope: ${proposal.scope}\n\nReviewed replacement:\n\n${proposal.after}\n\n${proposal.commit ? `Method commit: ${proposal.commit}` : 'Applied only within the reviewed scope.'}\n\n\x60\x60\x60relentless-accepted\n${JSON.stringify(accepted, null, 2)}\n\x60\x60\x60`);
+    return { ...proposal, ...record };
   }
   export(id) { const s = this.store.read(id); if (!s.values) throw new Fault(s.error, 422); return { text: portable(s) }; }
 }

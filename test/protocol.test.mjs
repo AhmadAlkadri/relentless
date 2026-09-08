@@ -55,7 +55,9 @@ test('session traversal and symlinks rejected, project roots constrained', () =>
 });
 test('Tune reject is pure for rules, preference acceptance versioned and stale method refused', () => {
   const { store, app } = fixture(); const s = store.create(); const p = protocol(); const m = s.meta;
-  m.tune = { version: p.version, preferenceVersion: app.preferences().version, proposals: [{ id: 'reject', status: 'proposed', scope: 'method', before: 'text', after: 'replacement' }, { id: 'preference', status: 'proposed', scope: 'preference', after: 'Use concrete examples.' }, { id: 'stale', status: 'proposed', scope: 'method', before: 'text', after: 'replacement' }] }; store.setMeta(s.id, m);
+  const proposals = [{ scope: 'method', before: 'text', after: 'replacement' }, { scope: 'preference', after: 'Use concrete examples.' }, { scope: 'method', before: 'text', after: 'replacement' }], encoded = JSON.stringify(proposals);
+  store.append(s.id, 'Tune review', '```relentless-tune\n' + encoded + '\n```');
+  m.tune = { version: p.version, preferenceVersion: app.preferences().version, sourceHash: hash(encoded), proposals: ['reject', 'preference', 'stale'].map(id => ({ id, status: 'proposed' })) }; store.setMeta(s.id, m);
   app.tuneDecision(s.id, { proposalId: 'reject', decision: 'reject' }); assert.equal(protocol().version, p.version);
   app.tuneDecision(s.id, { proposalId: 'preference', decision: 'accept' }); assert.equal(app.preferences().text, 'Use concrete examples.'); assert.ok(fs.readdirSync(path.join(store.root, 'history')).some(f => f.startsWith('preferences-')));
   assert.throws(() => app.tuneDecision(s.id, { proposalId: 'stale', decision: 'accept', version: 'wrong' }), /changed since review/);
