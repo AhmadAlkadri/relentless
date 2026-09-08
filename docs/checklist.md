@@ -1,8 +1,9 @@
 # Implementation
 
-- [ ] Inventory, private origin, storage boundaries
-- [ ] Canonical protocol, migration, reversible installer, control tests
-- [ ] Codex conversation and editable Markdown workspace
-- [ ] Claude, recovery, external editing, Print and bounded Build
-- [ ] Worklist, Tune, preferences, portable export
-- [ ] Browser dogfood, live evidence, installation, clean final push
+- [x] Inventory, private origin, storage boundaries
+- [x] Canonical protocol, migration, reversible installer, control tests
+- [x] Codex conversation and editable Markdown workspace
+- [x] Claude, recovery, external editing, Print and bounded Build
+- [x] Worklist, Tune, preferences, portable export
+- [x] Browser dogfood, live evidence, installation
+- [ ] Final clean commit and private push

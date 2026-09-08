@@ -7,7 +7,7 @@ handing work over. Personal software, served only on your computer.
 relentless
 ```
 
-Open **Paste a worklist** to add your plain-text or Markdown list. Nothing is invented
+Open **Paste list** to add your plain-text or Markdown list. Nothing is invented
 or sent to a provider on import. Each item can have an optional project directory,
 a simple status, and its own interview. Reorder or rename items whenever useful.
 Ideas without repositories work too. The repository's demo list is synthetic.
@@ -22,7 +22,7 @@ the selected project. Private scratchpad and unsent drafts do not go automatical
 
 Write freely in the answer space. **Save** writes to the real Markdown document;
 **Continue** deliberately submits the answer. Saving or typing never calls a model.
-You can instead open the path shown under **Session document** in any text editor,
+You can instead open the path shown under **The real Markdown file** in any text editor,
 edit it, save, then Continue in the app. External saves appear without restarting.
 For a structured question card, use **Use saved Markdown draft**, review the copied
 answer, then **Send answer**. Copying never submits it. Your own free-form answer,
