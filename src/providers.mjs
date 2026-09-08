@@ -8,6 +8,10 @@ import { query } from '@anthropic-ai/claude-agent-sdk';
 import { contained, Fault } from './storage.mjs';
 
 function tomlValue(v) { if (Array.isArray(v)) return `[${v.map(tomlValue).join(',')}]`; if (v && typeof v === 'object') return `{${Object.entries(v).map(([k,x]) => `${JSON.stringify(k)}=${tomlValue(x)}`).join(',')}}`; return JSON.stringify(v); }
+export function codexTextChunk(stream, itemId, delta) {
+  const chunk = (stream.text && stream.lastItem !== itemId ? '\n\n' : '') + delta;
+  stream.lastItem = itemId; stream.text += chunk; return chunk;
+}
 export class CodexRPC {
   constructor(cwd, config = {}) {
     this.sequence = 0; this.pending = new Map(); this.onEvent = () => {}; this.onRequest = async () => ({ decision: 'decline' });
@@ -49,7 +53,8 @@ export function codexConfig(project, mode) {
 
 export async function runCodex(opts) {
   const { cwd, mode, prompt, system, providerId, emit, interact, signal, saveId } = opts;
-  const rpc = new CodexRPC(cwd, codexConfig(cwd, mode)); let turnId, threadId, settled = false, output = '';
+  const rpc = new CodexRPC(cwd, codexConfig(cwd, mode)); let turnId, threadId, settled = false;
+  const stream = { text: '', lastItem: null }, seenMessages = new Set();
   try {
     await rpc.ready;
     const servers = await rpc.request('mcpServerStatus/list', {});
@@ -69,8 +74,8 @@ export async function runCodex(opts) {
       rpc.onEvent = m => {
         const p = m.params || {}; if (p.threadId && p.threadId !== threadId) return;
         if (m.method === 'turn/started') { turnId = p.turn.id; emit({ type: 'turn', id: turnId }); }
-        if (m.method === 'item/agentMessage/delta') { output += p.delta; emit({ type: 'delta', text: p.delta }); }
-        if (m.method === 'item/completed' && p.item?.type === 'agentMessage' && !output) { output = p.item.text; emit({ type: 'delta', text: output }); }
+        if (m.method === 'item/agentMessage/delta') { seenMessages.add(p.itemId); emit({ type: 'delta', text: codexTextChunk(stream, p.itemId, p.delta) }); }
+        if (m.method === 'item/completed' && p.item?.type === 'agentMessage' && !seenMessages.has(p.item.id)) { seenMessages.add(p.item.id); emit({ type: 'delta', text: codexTextChunk(stream, p.item.id, p.item.text) }); }
         if (m.method === 'turn/completed') finish(p.turn.status === 'failed' ? new Error(p.turn.error?.message || 'Codex turn failed') : null);
         if (m.method === 'error') emit({ type: 'notice', text: p.error?.message || 'Provider error' });
       };
@@ -96,7 +101,7 @@ export async function runCodex(opts) {
       if (signal.aborted) { cancel(); return; }
       rpc.request('turn/start', { threadId, input: [{ type: 'text', text: prompt, text_elements: [] }], effort: 'xhigh', permissions: 'relentless', approvalPolicy: mode === 'build' ? 'on-request' : 'never' }).then(r => { turnId = r.turn.id; }).catch(finish);
     });
-    return { text: output, providerId: threadId };
+    return { text: stream.text, providerId: threadId };
   } finally { rpc.close(); }
 }
 

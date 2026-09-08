@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
 import { startServer } from '../src/server.mjs';
-import { safeClaudePath, codexConfig } from '../src/providers.mjs';
+import { safeClaudePath, codexConfig, codexTextChunk } from '../src/providers.mjs';
 import { replaceSection, renderDocument, parseDocument } from '../src/storage.mjs';
 
 test('server rejects unauthenticated, cross-origin, wrong-host, and traversal requests', async () => {
@@ -47,4 +47,11 @@ test('restart retains browser origin and rotates the local capability', async ()
 test('a second server cannot mark the live owner requests interrupted', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'relentless-owner-')); const first = await startServer({ root });
   try { const s = first.store.create(); const m = s.meta; m.status = 'running'; m.mode = 'build'; first.store.setMeta(s.id, m); await assert.rejects(startServer({ root }), /already owns/); assert.equal(first.store.meta(s.id).status, 'running'); assert.equal(first.store.meta(s.id).mode, 'build'); } finally { await first.close(); }
+});
+test('Codex streamed message boundaries preserve readable paragraphs', () => {
+  const stream = { text: '', lastItem: null };
+  assert.equal(codexTextChunk(stream, 'commentary', 'Inspecting'), 'Inspecting');
+  assert.equal(codexTextChunk(stream, 'commentary', ' now.'), ' now.');
+  assert.equal(codexTextChunk(stream, 'final', 'The scope is ready.'), '\n\nThe scope is ready.');
+  assert.equal(stream.text, 'Inspecting now.\n\nThe scope is ready.');
 });

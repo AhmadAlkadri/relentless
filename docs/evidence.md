@@ -20,14 +20,14 @@ fixture storage and are deliberately not committed.
 
 ## Deterministic verification
 
-`npm test`: 34 tests covering installer and rollback, exact control recognition,
+`npm test`: 35 tests covering installer and rollback, exact control recognition,
 Unicode/fences/long answers, invalid Markdown preservation, external save by rename,
 revision conflicts, pure Print and private-context exclusion, stale scope and
 project identity, request deduplication, pause/recovery, eleven isolated items,
 Tune rejection and version checks, scoped preference updates, parallel question
 serialization and cancellation, execution questions preserving scope, path traversal,
 symlink guards, host/origin/capability enforcement, subprocess restrictions, stable
-restart origin, and exclusive server ownership.
+restart origin, exclusive server ownership, and readable streamed-message boundaries.
 
 `npm run check`: JavaScript syntax, skill metadata and whitespace. These are
 structural checks, not a behavioral-quality score. `npm audit --omit=dev` reported
