@@ -2,11 +2,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn, execFileSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dataHome, json } from '../src/storage.mjs';
 import { protocol, portable, repo } from '../src/protocol.mjs';
 
-const args = process.argv.slice(2), command = args[0] || 'open';
+const args = process.argv.slice(2), command = args[0] === '--help' ? 'help' : args[0] && !args[0].startsWith('--') ? args[0] : 'open';
 const option = name => { const i = args.indexOf(name); return i < 0 ? undefined : args[i + 1]; };
 const noOpen = args.includes('--no-open');
 async function connection(start = true) {
@@ -32,13 +33,19 @@ try {
   else if (command === 'install' || command === 'uninstall') { const { install } = await import('../scripts/install.mjs'); console.log(JSON.stringify(await install({ repo, uninstall: command === 'uninstall', dryRun: args.includes('--dry-run') }), null, 2)); }
   else if (command === 'stop') { console.log(await api(await connection(false), 'stop', {})); }
   else if (command === 'portable' && !args[1]) console.log(portable());
-  else if (['open', 'new', 'resume', 'tune', 'print', 'portable', 'path'].includes(command)) {
+  else if (['open', 'new', 'resume', 'tune', 'print', 'portable', 'path', 'build', 'where', 'pause', 'interview'].includes(command)) {
     const state = await connection(); let id = args[1];
     if (command === 'new') {
       let context = ''; if (args.includes('--context-stdin')) for await (const chunk of process.stdin) { context += chunk; if (context.length > 100000) throw new Error('Context packet exceeds 100 KB.'); }
       const s = await api(state, 'new', { title: option('--title') || (option('--project') ? path.basename(option('--project')) : 'Untitled idea'), project: option('--project'), backend: option('--backend') || 'codex', context }); id = s.id; console.log(`Markdown: ${s.path}`);
     }
-    if (['print', 'portable', 'path'].includes(command)) { const s = await api(state, `sessions/${id}`); if (command === 'path') console.log(s.path); else console.log((await api(state, `sessions/${id}/${command === 'portable' ? 'export' : 'print'}`, { revision: s.revision })).text); }
+    if (['build', 'where', 'pause', 'interview'].includes(command)) {
+      const s = await api(state, `sessions/${id}`);
+      if (command === 'pause') console.log(await api(state, `sessions/${id}/pause`, {}));
+      else { if (command === 'build') console.log(`Build target: ${s.meta.project}\nSaved scope:\n${s.values?.brief}\n${s.values?.decisions}\nPermissions: selected project only; no publication, spending, destructive operations or global configuration changes. Ordinary approvals remain in the workspace.`);
+        await api(state, `sessions/${id}/turn`, { action: command === 'where' ? 'summary' : command, revision: s.revision, scope: s.scope, requestId: randomUUID() }); open(state, id); }
+    }
+    else if (['print', 'portable', 'path'].includes(command)) { const s = await api(state, `sessions/${id}`); if (command === 'path') console.log(s.path); else console.log((await api(state, `sessions/${id}/${command === 'portable' ? 'export' : 'print'}`, { revision: s.revision })).text); }
     else open(state, command === 'open' ? '' : id || '', command === 'tune');
-  } else console.log('Usage: relentless [new --project PATH --backend codex|claude | resume ID | tune ID | path ID | print ID | portable [ID] | doctor | stop | uninstall]\nOptions: --no-open, --title TEXT, --context-stdin. No shell configuration changes are needed.');
+  } else console.log('Usage: relentless [new --project PATH --backend codex|claude | resume ID | interview ID | where ID | build ID | pause ID | tune ID | path ID | print ID | portable [ID] | doctor | stop | uninstall]\nOptions: --no-open, --title TEXT, --context-stdin. No shell configuration changes are needed.');
 } catch (e) { console.error(`Relentless: ${e.message}`); process.exitCode = 1; }

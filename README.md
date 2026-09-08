@@ -24,6 +24,9 @@ Write freely in the answer space. **Save** writes to the real Markdown document;
 **Continue** deliberately submits the answer. Saving or typing never calls a model.
 You can instead open the path shown under **Session document** in any text editor,
 edit it, save, then Continue in the app. External saves appear without restarting.
+For a structured question card, use **Use saved Markdown draft**, review the copied
+answer, then **Send answer**. Copying never submits it. Your own free-form answer,
+including "Help me think through this", is always supported.
 
 The side panel separates working brief, accepted decisions, verified facts,
 assumptions and current questions. Agent state suggestions are proposals: review
@@ -61,6 +64,9 @@ relentless new --title "An idea without a repository" --backend claude
 relentless resume SESSION_ID
 relentless path SESSION_ID
 relentless print SESSION_ID
+relentless where SESSION_ID
+relentless build SESSION_ID
+relentless pause SESSION_ID
 relentless tune SESSION_ID
 relentless portable SESSION_ID
 relentless doctor
@@ -142,6 +148,9 @@ for dry-run rollback and interrupted-installer recovery.
 Run `npm test` and `npm run check`. Live opt-in scripts use disposable synthetic
 projects: `node scripts/live-smoke.mjs codex|claude` and
 `node scripts/live-build.mjs codex|claude`. They use real authenticated inference.
+`node scripts/browser-dogfood.mjs` runs the real Codex browser workflow;
+`node scripts/browser-questions.mjs mock|claude` checks question cards and external
+answers. Browser scripts use an isolated Chrome profile, never your personal profile.
 See [evidence](docs/evidence.md) for actual runs and [compatibility](docs/compatibility.md)
 for protocol versions, supported APIs and platform limits.
 

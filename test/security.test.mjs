@@ -44,3 +44,7 @@ test('restart retains browser origin and rotates the local capability', async ()
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'relentless-restart-')); const first = await startServer({ root }); const { origin, token } = first; await first.close(); const second = await startServer({ root });
   try { assert.equal(second.origin, origin); assert.notEqual(second.token, token); assert.equal((await fetch(origin + '/api/state', { headers: { Authorization: `Bearer ${token}` } })).status, 401); } finally { await second.close(); }
 });
+test('a second server cannot mark the live owner requests interrupted', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'relentless-owner-')); const first = await startServer({ root });
+  try { const s = first.store.create(); const m = s.meta; m.status = 'running'; m.mode = 'build'; first.store.setMeta(s.id, m); await assert.rejects(startServer({ root }), /already owns/); assert.equal(first.store.meta(s.id).status, 'running'); assert.equal(first.store.meta(s.id).mode, 'build'); } finally { await first.close(); }
+});

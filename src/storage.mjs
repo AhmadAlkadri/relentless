@@ -57,7 +57,7 @@ export function replaceSection(raw, key, value) {
   parseDocument(updated); return updated;
 }
 export function publicContext(values) { return sections.filter(k => !['draft', 'scratchpad'].includes(k)).map(k => `## ${k}\n${values[k]}`).join('\n\n'); }
-export function scopeHash(values, project) { return hash(JSON.stringify([project, ...['brief', 'decisions', 'facts', 'assumptions'].map(k => values[k])])); }
+export function scopeHash(values, project) { return hash(JSON.stringify([project, ...['brief', 'decisions', 'facts', 'assumptions', 'questions'].map(k => values[k])])); }
 
 export class Store {
   constructor(root = dataHome(), repo) {
@@ -101,7 +101,8 @@ export class Store {
     if (typeof title !== 'string' || title.length > 250) throw new Fault('Use a title under 250 characters.');
     project = projectPath(project, [this.root, this.repo].filter(Boolean));
     const id = randomUUID();
-    this.setMeta(id, { id, title, project, backend, created: new Date().toISOString(), status: 'idle', mode: 'interview', providers: {}, requests: [], protocol: null });
+    const stat = project ? fs.statSync(project) : null;
+    this.setMeta(id, { id, title, project, projectIdentity: stat ? { device: stat.dev, inode: stat.ino } : null, backend, created: new Date().toISOString(), status: 'idle', mode: 'interview', providers: {}, requests: [], protocol: null });
     atomic(this.file(id), renderDocument(title, { brief: context || title }));
     return this.read(id);
   }

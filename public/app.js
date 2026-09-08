@@ -290,7 +290,8 @@ function renderPending() {
     const options = (question.options || []).map(option => button(option.label || option, () => { area.value = option.label || option; area.dispatchEvent(new Event('input')); area.focus(); }, { title: option.description || '' }));
     options.push(button('Help me think through this', () => { area.value = 'Help me think through this.'; area.dispatchEvent(new Event('input')); area.focus(); }));
     const bufferKey = `relentless-question:${selected}:${pending.id}:${key}`; area.value = readLocal(bufferKey, ''); area.addEventListener('input', () => writeLocal(bufferKey, area.value));
-    return el('fieldset', {}, el('legend', { text: question.question || question.header || 'A question for you' }), el('div', { class: 'pending-options' }, ...options), area);
+    const fromDraft = button('Use saved Markdown draft', () => { if (area.value.trim()) throw new Error('Clear this question answer first to preserve your current writing.'); area.value = current.values?.draft || ''; area.dispatchEvent(new Event('input')); area.focus(); notice('Saved draft copied. Review it, then send the answer explicitly.'); });
+    return el('fieldset', {}, el('legend', { text: question.question || question.header || 'A question for you' }), el('div', { class: 'pending-options' }, ...options), area, fromDraft);
   });
   const submit = button('Send answer', async () => {
     const values = Object.fromEntries(Object.entries(answers).map(([key, area]) => [key, area.value])); if (!Object.values(values).some(x => x.trim())) throw new Error('Write anything that helps, including a question back.');
@@ -327,7 +328,14 @@ function renderTune() {
     if (pending) actions.append(button('Reject', () => decide('reject')), button('Defer', () => decide('defer')), button('Accept reviewed change', () => decide('accept'), { class: 'primary' }));
     if (proposal.implementationPrompt) actions.append(button('Copy implementation prompt', () => showText('Interface implementation proposal', proposal.implementationPrompt, 'relentless-interface-change.md')));
     const details = el('dl'); for (const [label, value] of [['Observed friction or success', proposal.observed], ['Supporting exchange or feedback', proposal.evidence], ['Expected benefit', proposal.benefit], ['Possible downside', proposal.downside], ['Before', proposal.before]]) details.append(el('dt', { text: label }), el('dd', { text: value || 'Not specified in this proposal.' }));
-    $('tune-proposals').append(el('article', { class: 'tune-card' }, el('p', { class: 'proposal-status', text: `${proposal.scope} · ${proposal.status}` }), el('h3', { text: proposal.change || 'A proposed refinement' }), details, el('label', { text: pending ? 'After / your edited replacement' : 'Reviewed replacement' }), after, proposal.commit ? el('p', { class: 'file-path', text: `Method commit: ${proposal.commit}` }) : null, actions));
+    let preferencePreview = null;
+    if (proposal.scope === 'preference' && pending) {
+      const preview = el('pre', { text: proposal.preferencePreview || '' });
+      const update = () => { const current = proposal.currentPreference || '', before = proposal.before || '', replacement = after.value; preview.textContent = !current || current === before ? replacement : before && current.split(before).length === 2 ? current.replace(before, replacement) : current.includes(replacement) ? current : `${current}\n\n${replacement}`.trim(); };
+      after.addEventListener('input', update);
+      preferencePreview = el('details', { open: true }, el('summary', { text: 'Resulting personal preferences' }), el('p', { class: 'small muted', text: 'A matching excerpt is replaced. Otherwise this adds the reviewed preference while preserving existing text.' }), preview);
+    }
+    $('tune-proposals').append(el('article', { class: 'tune-card' }, el('p', { class: 'proposal-status', text: `${proposal.scope} · ${proposal.status}` }), el('h3', { text: proposal.change || 'A proposed refinement' }), details, el('label', { text: pending ? 'After / your edited replacement' : 'Reviewed replacement' }), after, preferencePreview, proposal.commit ? el('p', { class: 'file-path', text: `Method commit: ${proposal.commit}` }) : null, actions));
   }
 }
 document.addEventListener('keydown', event => {

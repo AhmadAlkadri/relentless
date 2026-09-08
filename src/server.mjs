@@ -3,14 +3,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { Store, dataHome, Fault, hash, atomic, scopeHash, json } from './storage.mjs';
-import { Workspace } from './service.mjs';
+import { Workspace, checkProject } from './service.mjs';
 import { repo, protocol } from './protocol.mjs';
 
 export async function startServer({ root = dataHome(), port = 0 } = {}) {
-  const store = new Store(root, repo), app = new Workspace(store), token = randomBytes(32).toString('hex');
+  const store = new Store(root, repo), token = randomBytes(32).toString('hex');
   const lock = path.join(store.root, 'server.lock');
   try { const fd = fs.openSync(lock, 'wx', 0o600); fs.writeFileSync(fd, String(process.pid)); fs.closeSync(fd); }
   catch (e) { const pid = Number(fs.readFileSync(lock, 'utf8')); let alive = false; try { process.kill(pid, 0); alive = true; } catch {} if (alive) throw new Error('A Relentless server already owns this storage directory.'); fs.unlinkSync(lock); const fd = fs.openSync(lock, 'wx', 0o600); fs.writeFileSync(fd, String(process.pid)); fs.closeSync(fd); }
+  const app = new Workspace(store);
   let origin;
   const staticFiles = {
     '/': ['public/index.html', 'text/html'], '/app.js': ['public/app.js', 'text/javascript'], '/style.css': ['public/style.css', 'text/css'],
@@ -73,7 +74,7 @@ export async function startServer({ root = dataHome(), port = 0 } = {}) {
   const stateFile = path.join(store.root, 'server.json'); atomic(stateFile, JSON.stringify({ pid: process.pid, origin, token, root: store.root }));
   // Poll the actual Markdown inode, including replace/rename saves, to revoke a
   // running Build if its agreed scope is edited outside the browser.
-  const watcher = setInterval(() => { if (app.active?.mode === 'build') { try { const s = store.read(app.active.id); if (!s.values || scopeHash(s.values, s.meta.project) !== app.active.scope) app.pause(s.id); } catch { app.pause(app.active.id); } } }, 500);
+  const watcher = setInterval(() => { if (app.active?.mode === 'build') { try { const s = store.read(app.active.id); checkProject(s.meta); if (!s.values || scopeHash(s.values, s.meta.project) !== app.active.scope) app.pause(s.id); } catch { app.pause(app.active.id); } } }, 500);
   let closed = false;
   async function close() { if (closed) return; closed = true; clearInterval(watcher); if (app.active) { app.pause(app.active.id); await Promise.race([app.active.done, new Promise(r => setTimeout(r, 5000))]); } server.closeAllConnections(); await new Promise(r => server.close(r)); if (Number(fs.readFileSync(lock, 'utf8')) === process.pid) fs.unlinkSync(lock); if (fs.existsSync(stateFile)) fs.unlinkSync(stateFile); }
   return { server, app, store, origin, token, close };
