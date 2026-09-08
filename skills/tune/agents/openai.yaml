@@ -1,0 +1,6 @@
+interface:
+  display_name: "Tune"
+  short_description: "Review and deliberately improve the experience"
+  default_prompt: "Use $tune to review this Relentless experience and propose focused changes."
+policy:
+  allow_implicit_invocation: false

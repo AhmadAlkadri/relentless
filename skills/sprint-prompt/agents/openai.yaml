@@ -1,0 +1,6 @@
+interface:
+  display_name: "Sprint Prompt"
+  short_description: "Package work for a fresh agent session"
+  default_prompt: "Use $sprint-prompt to prepare a saved handoff without implementing it."
+policy:
+  allow_implicit_invocation: false
