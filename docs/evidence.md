@@ -484,3 +484,12 @@ attachment and original question IDs were unchanged. An unchanged native default
 session, target, attachment and question, no exchanges, no prompt and no pending
 control. This is live acceptance of one full-duration idle transport interval;
 human answer/Build and concurrent project execution remain separate dogfood cases.
+
+One host-wrapper limitation was observed during later tab cleanup: terminating the
+outer JavaScript orchestration cell did not immediately cancel its nested native
+MCP wait. A replacement wait was correctly rejected because the first still owned
+the attachment. No question or authority changed. The root allowed the bounded
+HTTP interval to expire before resuming. The earlier HTTP AbortSignal fixture
+certifies cancellation at that transport layer, not cancellation propagation by
+every hosting wrapper. Prefer the normal pending-result boundary for maintenance;
+do not treat an outer task termination as proof that the MCP request ended.
