@@ -472,3 +472,15 @@ attachments and revokes unacknowledged Build; the root must inspect and delibera
 reopen the same owned session before waiting again. No automatic authority recovery
 was introduced. Native four-minute idle continuation after integration is a separate
 live acceptance check, not claimed by the shortened HTTP fixtures.
+
+Root accepted `0f913fb` after inspecting the HTTP cap and rerunning both real HTTP
+regressions (**2/2 passed**, exit 0). At a supported boundary the root cancelled
+only its pending transport, confirmed the original project attachment had no
+submitted answers, prompt or pending control, and restarted the idle UI service.
+The same installed MCP owner deliberately reopened the exact session; its
+attachment and original question IDs were unchanged. An unchanged native default
+`await_interview` then returned `operation: pending, authorized: false` after
+**240,021 ms**, without a fetch error. A following status read confirmed the same
+session, target, attachment and question, no exchanges, no prompt and no pending
+control. This is live acceptance of one full-duration idle transport interval;
+human answer/Build and concurrent project execution remain separate dogfood cases.
