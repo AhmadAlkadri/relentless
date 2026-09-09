@@ -11,7 +11,7 @@ const root = fs.mkdtempSync(path.join(os.tmpdir(), `relentless-build-${backend}-
 const store = new Store(path.join(root, 'private'), repo), app = new Workspace(store); let s = store.create({ title: 'SYNTHETIC Build and Tune', project, backend, context: 'Create exactly hello.txt with the text hello relentless followed by a newline. Check its content. This disposable fixture intentionally has no Git repository; do not initialize or commit. No other changes.' });
 console.log(`Fixture ${root}\nSession ${s.id}`);
 async function run(action, text = '') {
-  s = store.read(s.id); await app.begin(s.id, { action, text, revision: s.revision, scope: scopeHash(s.values, s.meta.project), requestId: randomUUID() }); const active = app.active;
+  s = store.read(s.id); await app.begin(s.id, { action, text, revision: s.revision, scope: scopeHash(s.values, s.meta.project), promptRevision: app.prompts.view(s.id)?.revision, target: s.meta.project, requestId: randomUUID() }); const active = app.active;
   const timer = setInterval(() => {
     const p = active.pending?.display;
     if (p) {
@@ -28,6 +28,8 @@ async function run(action, text = '') {
 }
 await run('continue', 'Please implement the hello.txt task. This is an interview answer describing the intended change, not a Build control.');
 assert.equal(fs.existsSync(path.join(project, 'hello.txt')), false, 'Action language must not write in interview');
+if (!app.prompts.view(s.id)?.ready) await run('synthesize');
+assert.equal(app.prompts.view(s.id)?.ready, true, 'Interviewer must publish a ready working prompt before Build');
 await run('build');
 assert.equal(fs.readFileSync(path.join(project, 'hello.txt'), 'utf8'), 'hello relentless\n');
 assert.deepEqual(fs.readdirSync(project).sort(), ['README.md', 'hello.txt']);

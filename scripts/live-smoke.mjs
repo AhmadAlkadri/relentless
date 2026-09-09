@@ -32,5 +32,5 @@ s = store.update(s.id, 'draft', 'Help me think through this. I want to sort note
 app = new Workspace(store); // New app owner resumes the persisted provider session.
 await turn('continue');
 await turn('summary');
-const before = store.read(s.id).raw; const handoff = app.print(s.id, store.read(s.id).revision); if (store.read(s.id).raw !== before) throw new Error('Print mutated Markdown'); console.log(`PRINT ${handoff.text.length} characters, canonical Markdown unchanged`);
+const before = store.read(s.id).raw; let handoff = await app.print(s.id, store.read(s.id).revision); if (handoff.preparing) { await app.active.done; handoff = await app.print(s.id, store.read(s.id).revision); } if (store.read(s.id).raw !== before) throw new Error('Print synthesis unexpectedly mutated the interview record'); console.log(`PRINT ${handoff.text.length} characters, canonical interview Markdown unchanged; working prompt retained`);
 console.log(`LIVE CHECK COMPLETE ${backend}. Fixture retained at ${root}`);

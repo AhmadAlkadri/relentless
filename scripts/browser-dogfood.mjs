@@ -38,8 +38,8 @@ try {
   // Deliberately accept the concrete working scope into saved context.
   await page.locator('#context-button').click(); await page.locator('#editor-brief').fill('Create exactly hello.txt containing hello relentless followed by one newline. Preserve README.md. No other files, no Git initialization, no commit. Check exact bytes.'); await page.locator('[data-save=brief]').click();
   await page.locator('#summary-button').click(); await finish('Where are we');
-  s = server.store.read(id); const before = s.raw;
-  await page.locator('#editor-draft').fill('PRIVATE UNSENT DRAFT'); await page.locator('#print-button').click(); const output = await page.getByLabel('Execution prompt', { exact: true }).inputValue(); assert.ok(output.includes('hello.txt')); assert.ok(!output.includes('PRIVATE UNSENT')); assert.equal(server.store.read(id).raw, before); await page.locator('#modal-close').click(); console.log('PASS pure Print from saved context');
+  s = server.store.read(id); const savedDraft = s.values.draft;
+  await page.locator('#editor-draft').fill('PRIVATE UNSENT DRAFT'); await page.locator('#print-button').click(); if (server.app.active) await finish('Print synthesis by standalone interviewer'); const output = await page.getByLabel('Working execution prompt', { exact: true }).inputValue(); assert.ok(output.includes('hello.txt')); assert.ok(!output.includes('PRIVATE UNSENT')); assert.equal(server.store.read(id).values.draft, savedDraft); await page.locator('#modal-close').click(); console.log('PASS Print retained one working prompt from public conversation');
   await page.locator('#build-details > summary').click(); await page.locator('#build-button').click(); await finish('explicit fixture Build');
   assert.equal(fs.readFileSync(path.join(project, 'hello.txt'), 'utf8'), 'hello relentless\n'); assert.deepEqual(fs.readdirSync(project).sort(), ['README.md', 'hello.txt']);
   assert.equal(await page.locator('#editor-draft').inputValue(), 'PRIVATE UNSENT DRAFT');

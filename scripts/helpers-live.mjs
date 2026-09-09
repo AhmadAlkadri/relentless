@@ -1,0 +1,23 @@
+// Real installed answer helpers with synthetic public context; no main interviewer is started.
+import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'; import assert from 'node:assert/strict'; import { randomUUID } from 'node:crypto';
+import { startServer } from '../src/server.mjs'; import { chromium } from '@playwright/test';
+const provider=process.argv[2]; if(!['codex','claude'].includes(provider))throw new Error('Choose helper provider');
+const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),`relentless-helper-live-${provider}-`))),project=path.join(root,'project');fs.mkdirSync(project);fs.writeFileSync(path.join(project,'README.md'),'# Synthetic reading list\nA keyboard-only local application.\n');fs.writeFileSync(path.join(project,'.env'),'SECRET_CANARY_DO_NOT_READ');
+const host=await startServer({root:path.join(root,'private')}); let browser;
+console.log(JSON.stringify({provider,root,phase:'starting'}));
+try {
+ const owner=randomUUID(),o=host.app.attachments.open(owner,{cwd:project,client:provider==='codex'?'claude':'codex',intent:'Synthetic helper integration'}),id=o.session;
+ host.app.attachments.publish(owner,{session:id,publicationId:randomUUID(),discussion:'We are choosing a first useful keyboard-only, local reading-list slice. Recommend one bounded outcome and explain the tradeoff.',questions:[{id:'outcome',question:'Which first useful outcome should the reading list deliver?'}]});
+ let s=host.store.read(id);host.store.update(id,'scratchpad','PRIVATE_SCRATCH_CANARY',s.revision);
+ browser=await chromium.launch();const page=await browser.newPage({viewport:{width:1440,height:1000}});const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(`${host.origin}/#token=${host.token}&session=${id}`);
+ const answer=page.getByRole('textbox',{name:/^Answer:/});await answer.fill('My existing writing must survive.');
+ await page.getByRole('combobox',{name:'Answer helper',exact:true}).selectOption(provider);await page.getByRole('button',{name:`Draft with ${provider==='codex'?'Codex':'Claude'}`,exact:true}).click();
+ const start=Date.now();while(!host.app.helpers.view(id).length||host.app.helpers.view(id)[0].status==='running'){if(Date.now()-start>180000)throw new Error('Helper exceeded bounded live test');await new Promise(r=>setTimeout(r,200));}
+ let h=host.app.helpers.view(id)[0];assert.equal(h.status,'draft',h.error);assert.ok(h.providerId);assert.ok(h.model);assert.equal(await answer.inputValue(),'My existing writing must survive.');assert.equal(host.store.meta(id).attachment.events.length,0);assert.deepEqual(host.store.meta(id).providers,{});assert.ok(!h.draft.includes('PRIVATE_SCRATCH_CANARY'));assert.ok(!h.draft.includes('SECRET_CANARY_DO_NOT_READ'));
+ await page.getByRole('button',{name:'Use this draft',exact:true}).click();await page.getByRole('dialog').waitFor();assert.equal(await answer.inputValue(),'My existing writing must survive.');await page.getByRole('button',{name:'Append suggestion',exact:true}).click();assert.match(await answer.inputValue(),/My existing writing must survive/);assert.equal(host.store.meta(id).attachment.events.length,0);
+ await page.getByRole('button',{name:'Discuss this draft',exact:true}).click();await page.getByRole('textbox',{name:'Private message to helper',exact:true}).fill('Privately make the recommendation more concise, with one concrete verification step. Do not invent user consent.');await page.getByRole('button',{name:'Send to helper',exact:true}).click();
+ const resumeStart=Date.now();while(host.app.helpers.view(id)[0].status==='running'){if(Date.now()-resumeStart>180000)throw new Error('Helper resume exceeded bounded test');await new Promise(r=>setTimeout(r,200));}
+ const resumed=host.app.helpers.view(id)[0];assert.equal(resumed.status,'draft',resumed.error);assert.equal(resumed.providerId,h.providerId);assert.equal(host.store.meta(id).attachment.events.length,0);assert.equal(host.app.prompts.view(id),null);
+ await page.screenshot({path:path.join(root,'helper.png'),fullPage:true});assert.deepEqual(errors,[]);assert.deepEqual(fs.readdirSync(project),['.env','README.md']);
+ const evidence={provider,model:resumed.model,helperSession:h.providerId,resumedSession:resumed.providerId,interviewerProviderSessions:host.store.meta(id).providers,submittedEvents:host.store.meta(id).attachment.events.length,root,errors,draft:resumed.draft};fs.writeFileSync(path.join(root,'evidence.json'),JSON.stringify(evidence,null,2));console.log(JSON.stringify(evidence,null,2));
+} finally{await browser?.close();for(const id of host.app.helpers.running.keys())host.app.helpers.cancel(id);await host.close();}

@@ -1,83 +1,85 @@
-# Verified integration contracts
+# Compatibility and enforcement
 
-Inventory date: 2026-09-08. Node 25.2.1, npm 11.19.0, gh 2.96.0,
-Codex CLI 0.153.4, Claude Code 2.1.265, Claude Agent SDK 0.3.265.
-This personal application uses the installed clients and their existing login.
-It does not read, copy, migrate or persist authentication tokens. No API key,
-alternate provider, model fallback or new billing route is configured.
+Verified installed clients: Codex CLI 0.153.4 and Claude Code 2.1.266 on macOS;
+Node 25.2.1. The existing standalone adapters remain Codex App Server and Claude
+Agent SDK 0.3.265. Attached interviewing uses neither adapter.
 
-## Codex
+## Native transport
 
-The installed `model/list` catalog exposes `gpt-6-astra` and xhigh reasoning.
-Relentless requests that exact identifier per app-owned session. Global model
-settings remain untouched. The App Server runs as a private stdio subprocess.
-The browser never receives its transport, provider control messages or auth.
+Local stdio MCP exposes `open_interview`, `publish_interview`, `await_interview` and
+`attachment_status`. Each MCP process owns a random connection capability. The
+browser uses a different token and cannot publish interviewer messages, consume
+controls or acknowledge handback. Event UUIDs, publication IDs, source hashes,
+question revisions and prompt hashes bind operations. A delivered Build is never
+returned a second time as authority. Crash/disconnect revokes unacknowledged Build.
 
-`generate-json-schema --experimental` and `generate-ts --experimental` were run
-from this exact installed version before implementing message shapes. Reproduce
-the consumed-contract check with `node scripts/verify-schema.mjs`.
-Used methods include initialize, model/list, skills/list, thread/start,
-thread/resume, thread/read, turn/start, turn/interrupt, agentMessage deltas,
-turn completion, tool questions and per-operation approvals. Unknown server
-requests fail closed. Questions use free-text answer arrays keyed by question ID.
+Project context comes from the native agent's invocation directory, resolved through
+Git's worktree root and realpath. Invocation subdirectories are retained. No remote
+URL or newest-session heuristic identifies a project or native owner. Claude's
+`${CLAUDE_SESSION_ID}` skill substitution is supported. Codex generic MCP does not
+provide a verified native thread ID here: absent one explicitly supplied by the
+native client, identity is honestly connection-only. New-session note resumption
+is labeled as such. A changed known native session ID or replaced project inode
+cannot reuse the previous attachment. Native attachment may interview the Relentless
+source checkout itself, while the standalone provider still cannot target it. No terminal scraping, transcript rewriting or token extraction.
 
-App Server remains experimental. Named permission profiles are beta. Each private
-process defines and explicitly selects a project-only profile, checks the returned
-active profile, disables command network access, hooks, plugins, apps and external
-MCP tools, and refuses a turn if an external MCP tool remains active. The configured
-MCP servers are replaced by disabled definitions only within the child process.
-Global configuration is not changed. Interview commands have read-only access.
-Build commands have project write access, with project configuration and `.git`
-kept read-only. Broadening permission requests are declined; use a deliberately
-authorized native session when broader access or committing target changes is needed.
+[Codex MCP](https://developers.openai.com/codex/mcp) documents user configuration
+and the default 60-second tool timeout. The installer sets this server's timeout to
+1800 seconds; each wait lasts at most 1500 seconds. Idle expiration returns a pending
+state for another long wait, not model polling every few seconds.
 
-One version-specific edge was found: selecting a custom permission at turn/start
-needs its definition in the process config, not only thread/start overrides. Another
-was that overriding only a legacy MCP `enabled` leaf could lose its transport
-definition. Explicit process profiles and disabled definitions resolve both.
+[Claude MCP](https://code.claude.com/docs/en/mcp) documents a per-server hard timeout,
+a 30-minute stdio idle window in these versions, and interactive main-conversation
+automatic backgrounding after two minutes. Programmatic `-p` calls do not establish
+that interactive behavior. An isolated `-p` test with documented
+`CLAUDE_AUTO_BACKGROUND_TASKS=1` did observe native 120-second backgrounding and
+successful completion after a 150-second user wait. A backgrounded call is pending; the native agent must
+await its task notification. The bridge does not assume notifications can inject
+arbitrary user messages. Cancellation is not completion or authorization.
 
-## Claude
+## Answer helpers
 
-The adapter uses the supported Agent SDK with `pathToClaudeCodeExecutable` pointing
-to the installed `claude` executable, which remains authenticated with claude.ai
-Max. Real tests confirmed `claude-fable-5`, without an API key or `--bare` mode.
-This is a personal local wrapper, not an offer of subscription authentication to
-third-party users. Anthropic's SDK documentation restricts third-party products
-offering claude.ai login; this repository does not implement such an offer.
+Codex helpers use native `exec --json` and exact session-ID resumption, Astra
+`gpt-6-astra` with xhigh effort. Existing auth/provider configuration is retained;
+external MCP servers, shell, network, apps, plugins, hooks and delegation are disabled
+for that helper process. A dedicated read MCP exposes only bounded list/read/search
+inside the project, with symlink, config and common secret-path exclusions.
 
-The narrow tool list, restricted CLI mode, empty filesystem settings sources,
-strict empty MCP configuration, and PreToolUse guard keep interviews read-only.
-PreToolUse runs before auto-approved Read/Glob/Grep calls and validates resolved
-project paths. Build edits and sandboxed shell commands require individual UI
-approvals. No bypass mode is used. `AskUserQuestion` routes through `canUseTool`;
-free-form answers and tool approvals remain different application events.
-Ordinary prose questions are supported when the model does not request a card.
-The system prompt uses the supported custom prompt with snapshot disabled so a
-new turn's explicit protocol boundary is not represented as an implicit reload.
+Claude helpers use the installed CLI's programmatic streaming output, `--restricted`,
+no built-in tools, explicit read MCP configuration and exact `--resume` ID. Actual
+model identity is captured from initialization; no fallback model is configured.
+The helper is terminated on unexpected tool exposure or session substitution.
+Authentication remains the installed native route. No full native transcript,
+private scratchpad or unsent answer is copied automatically.
 
-## Skills and ChatGPT
+The read bridge enforces its own filesystem operations. No finite filename filter
+can identify every secret placed in an otherwise ordinary project document; users
+must choose appropriate public project context. Tool restriction does not make model
+recommendations independently verified facts. See
+[Codex non-interactive mode](https://developers.openai.com/codex/noninteractive),
+[Claude programmatic use](https://code.claude.com/docs/en/headless), and
+[Claude CLI](https://code.claude.com/docs/en/cli-reference).
 
-Codex `skills/list` discovered all three canonical sources without errors under
-`~/.agents/skills`, resolving to repository files. The legacy sprint-prompt path
-is also a direct link. `agents/openai.yaml` sets `allow_implicit_invocation: false`.
-Claude personal skill directories use individual links under `~/.claude/skills`
-and shared frontmatter `disable-model-invocation: true`. Native commands are
-`$relentless` / `$tune` in Codex and `/relentless` / `/tune` in Claude.
-These are skills, not newly registered native slash commands in Codex.
+## Terminal and resource ownership
 
-Local standalone skills do not automatically synchronize to ChatGPT web. Official
-documentation also describes plugin-distributed skills across more surfaces, but
-this installation does not publish or install an account-side ChatGPT plugin.
-`relentless portable` and each session's ChatGPT export generate instructions from
-the canonical source plus a compact accepted-context packet. Copy/paste or explicit
-download/upload is the supported portable route.
+[WezTerm spawn](https://wezterm.org/cli/cli/spawn.html) provides cwd, program argv and
+a returned pane ID; [activate-pane](https://wezterm.org/cli/cli/activate-pane.html)
+selects that exact pane. The bridge forwards documented `WEZTERM_PANE` and
+`WEZTERM_UNIX_SOCKET`. Missing identity yields an explicit limitation, never a
+most-recent pane guess. Helper discussion holds a lease until the native helper
+exits and its exact-session draft return completes. No concurrent CLI processes own
+that helper. Return does not submit the draft. Other helper terminals and the shared
+standalone UI server are not terminated on attached handback.
 
-## Primary documentation
+The bridge cannot sandbox, cancel or change every native tool in the original
+conversation. Its own operations are mechanically bounded; read-only investigation
+and respecting pending waits in the original agent are skill-level requirements,
+with normal native permissions intact. Browser/host disconnection preserves notes
+without execution authority. No broad Accessibility permission is needed.
 
-- [Codex skills, redirected to Build skills](https://learn.chatgpt.com/docs/build-skills)
-- [Codex App Server](https://learn.chatgpt.com/docs/app-server)
-- [Codex permission profiles](https://learn.chatgpt.com/docs/permissions)
-- [Claude personal skills](https://code.claude.com/docs/en/skills)
-- [Claude programmatic usage and authentication distinction](https://code.claude.com/docs/en/headless)
-- [Claude approvals and user input](https://code.claude.com/docs/en/agent-sdk/user-input)
-- [Claude Agent SDK overview](https://code.claude.com/docs/en/agent-sdk/overview)
+The unattended interactive Claude PTY and WezTerm tests did not reach a bridge call
+within 180 seconds. Their cause was not established. The native programmatic
+continuity, enabled background-task mechanism, and both sidecar helper discussions
+passed live tests. Full human-operated interactive terminal resumption/return is a
+remaining validation limit, not a claimed pass. Details and fixture identities are
+in [evidence.md](evidence.md).

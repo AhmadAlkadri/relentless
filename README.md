@@ -1,162 +1,169 @@
 # Relentless
 
-A local Markdown space for thinking through projects with an agent, then deliberately
-handing work over. Personal software, served only on your computer.
+A temporary interview sidecar for the native Claude Code or Codex conversation you
+already have open. Your original agent remains the interviewer and executor.
 
-```sh
-relentless
-```
+Start the client normally inside a project, then invoke **`$relentless` in Codex**
+or **`/relentless` in Claude Code**. The browser opens directly into that project’s
+interview. No title/path/backend form is required. The agent publishes explanations
+and questions there; you can answer freely, choose an option, or ask it to help you
+think through a question. Double-click the interview title to rename it.
 
-Open **Paste list** to add your plain-text or Markdown list. Nothing is invented
-or sent to a provider on import. Each item can have an optional project directory,
-a simple status, and its own interview. Reorder or rename items whenever useful.
-Ideas without repositories work too. The repository's demo list is synthetic.
+## From discussion to execution
 
-## Everyday use
+**Continue / Send answer** submits your reviewed answer to the original conversation.
+Saving Markdown or a draft never submits it. The context panel retains editable
+brief, decisions, facts, assumptions and questions; explicit answers in the
+conversation also inform synthesis without copying them into those fields.
+Agent recommendations remain proposals until accepted.
 
-Choose a thought or create one. Select Codex or Claude and add a working brief.
-**Start interview** connects a separate app-owned provider conversation. Local-first
-storage does not mean offline inference: saved public context and explicitly
-submitted answers go to the selected provider. Read-only project tools may inspect
-the selected project. Private scratchpad and unsent drafts do not go automatically.
+**Print** displays the one working execution prompt. If it does not exist or public
+context changed, Print asks the interviewer to synthesize it. The result is retained
+in private session storage. Repeated Print reuses the same body. The prompt records
+its source revision and incorporated exchanges, distinguishes evidence from
+assumptions, and contains task-specific thin slices and verification. It may be a
+provisional or investigation-only brief while decisions remain unsettled.
 
-Write freely in the answer space. **Save** writes to the real Markdown document;
-**Continue** deliberately submits the answer. Saving or typing never calls a model.
-You can instead open the path shown under **The real Markdown file** in any text editor,
-edit it, save, then Continue in the app. External saves appear without restarting.
-For a structured question card, use **Use saved Markdown draft**, review the copied
-answer, then **Send answer**. Copying never submits it. Your own free-form answer,
-including "Help me think through this", is always supported.
+**Review / edit working prompt** opens that same artifact, with Copy and explicit
+export. Your manual edits are preserved; later synthesis produces a proposed
+replacement for review. Changes to public context or submitted answers make the
+prompt potentially outdated. Private scratchpad and appearance changes do not.
 
-The side panel separates working brief, accepted decisions, verified facts,
-assumptions and current questions. Agent state suggestions are proposals: review
-them, put them in the relevant editor, and Save to accept them. The transcript and
-proposal text live in the Markdown file, not in a hidden conversation database.
+**Build agreed scope** authorizes that exact displayed prompt revision and target.
+The bridge returns the unchanged body to your original CLI conversation, receives
+its acknowledgment, and selects the captured WezTerm pane when available. The
+original agent executes under its existing model, effort, authentication and normal
+permissions. Build does not create an in-app execution session in attached mode.
+If no ready prompt exists, the click prepares one for review; it does not execute
+unseen scope. Once ready, Build itself is the authorization, with no duplicate
+confirmation of the same decision.
 
-**Where are we?** requests a readiness summary. **Print** immediately renders a
-self-contained execution prompt from the saved brief, decisions, facts, assumptions
-and questions. It excludes the transcript, scratchpad, unsent draft and unsaved
-context edits. Review those saved fields before Print. Copy and Save .md are separate
-actions; Print itself saves nothing and does not grant execution permission.
+**Where are we?** asks the interviewer for a useful status summary. **Return to
+terminal** finishes without authorizing implementation. **Pause** preserves the
+interview for deliberate reopening from the native conversation. Finishing during
+native computation is recorded for the next supported tool boundary; the interface
+does not claim to have cancelled that computation. A browser tab may stay open in
+its completed state. Disconnection or closing a tab never grants authority.
 
-The **Build** panel shows the current agreed scope, target and permissions. Clicking
-Build authorizes exactly that saved scope for one execution turn. Approvals for
-specific tools remain separate. Every turn returns to interview mode; changing scope
-revokes active execution. No deployment, publishing, spending, destructive operations
-or pushes are implied. Pause stops active work and preserves text and recovery.
+## Optional answer helpers
 
-**Tune** reviews the session only when invoked. It proposes method, personal
-preference, project or interface changes. Accept, edit, reject or defer each one.
-Method patches require the reviewed source version, pass checks and receive a
-focused local Git commit. They are never pushed automatically. Preferences remain
-local with history and are sent only when you check their inclusion control.
-Interface code proposals produce explicit implementation work, not hidden code edits.
+Choose **Codex** or **Claude** in the answer-helper dropdown and click **Draft with…**.
+The selected installed client starts a separately identified, restricted helper
+session. It can read bounded project files and advise; it has no shell, network,
+main-interview bridge, answer-submission or Build tools. It receives the question
+and public context. Current drafts and saved preferences are included only through
+their explicit inclusion controls. Scratchpad and the native transcript are excluded.
 
-Use the appearance controls for light/dark mode, text size and reading width.
-Focus mode keeps the exchange and answer space primary. Cmd/Ctrl+Enter continues,
-Cmd/Ctrl+S saves the focused editor, and Escape closes a dialog.
+Results appear as **Drafted by … · Not sent**, with the actual reported model.
+**Use this draft** inserts into an empty answer or offers append/replace choices
+when you have written text. Only your subsequent Send/Continue submits it. Older
+suggestions remain available to copy, without insertion into a changed question.
+One helper owns an interview at a time; errors or cancellation preserve writing.
 
-## Commands and skills
+**Discuss this draft** continues the exact helper privately in the sidecar, including
+the draft you are viewing/editing. **Discuss in WezTerm** resumes that exact helper
+session in a separate tab. Exit that helper when ready; a final exact-session
+request returns its proposed draft to the browser. Use this draft is still separate
+from submission. The original interviewer never receives the private discussion.
+Provider failures are shown without switching provider, auth route or billing.
 
-```sh
-relentless new --project /absolute/project --backend codex
-relentless new --title "An idea without a repository" --backend claude
-relentless resume SESSION_ID
-relentless path SESSION_ID
-relentless print SESSION_ID
-relentless where SESSION_ID
-relentless build SESSION_ID
-relentless pause SESSION_ID
-relentless tune SESSION_ID
-relentless portable SESSION_ID
-relentless doctor
-relentless stop
-```
+## Standalone, storage and recovery
 
-`--no-open` prints the local launch URL for manual opening. That URL contains a local
-capability: do not share it. `new --context-stdin` accepts a compact native-session
-handoff. It opens a separate workspace; it does not attach to the native conversation.
-
-Explicit native skills are `$relentless` and `$tune` in Codex, and `/relentless` and
-`/tune` in Claude Code. Ask for **terminal-only** when you want to stay in the native
-conversation. The skill normally opens the corresponding workspace and hands over
-ownership. Native skills preserve existing client permissions; prose is not a sandbox.
-The existing `sprint-prompt` invocation remains available for deliberately saved
-execution briefs, as distinct from Relentless's unsaved Print.
-
-ChatGPT portability is copy/paste or explicit Markdown upload through the export
-button or `relentless portable`. Exports derive from the canonical protocol. Local
-symlinks do not synchronize with ChatGPT web.
-
-## Files, recovery and privacy
+`relentless` still opens the worklist. **New thought** or
+`relentless new --project /absolute/project --backend codex|claude` explicitly starts
+a standalone workspace; Start interview creates an app-owned interviewer. Its
+Build executes in the existing standalone host with restricted tool approvals.
+Attachment failure never falls back to standalone. Native **terminal-only** use is
+also retained. Existing sessions stay in their original mode until deliberately
+resumed as notes by a native connection; this is labeled as new attachment context.
 
 Default private storage is `~/.local/share/relentless/`:
 
-- `sessions/UUID.md`: canonical editable session content.
-- `sessions/UUID.json`: provider IDs, request IDs, protocol hashes and review state.
-- `history/`: prior Markdown revisions and personal preference versions.
-- `recovery/`: incremental response text retained through interruption or conflict.
-- `preferences.json`: deliberately accepted personal collaboration preferences.
-- `install/`: installation manifest and original skill backups.
+- `sessions/UUID.md`: authoritative editable interview, including submitted exchanges.
+- `sessions/UUID.prompt.md`: the one working execution prompt.
+- `sessions/UUID.candidate-*.md`: proposed replacements, never automatic authority.
+- `sessions/UUID.helper-*.md`: private helper drafts and discussion.
+- `sessions/UUID.json`: identifiers, revisions, provenance and transport/review state.
+- `history/`, `recovery/`: prior revisions and interrupted output.
+- `preferences.json`: explicitly reviewed personal preferences.
+- `install/`, `install-bridge/`, `upgrade-backups/`: private rollback material.
 
-The app uses atomic writes, serialized mutations, revision checks and preserved
-versions. If an external edit conflicts with a dirty browser editor, neither is
-silently chosen. Compare and merge explicitly. Malformed section markers or an
-unfinished fence disable writes until repaired, while the original file stays readable.
-Keep the `<!-- relentless:... -->` markers intact. Code fences can contain examples
-of those markers without redirecting an edit.
+Markdown is editable externally; keep the section markers intact. Conflicts retain
+both versions. Browser refresh retains unsent writing. As with ordinary editors,
+an external writer can race the final check-to-rename interval; this is not a
+transactional filesystem or power-loss guarantee. A crash never automatically
+replays Build. Inspect uncertain execution in the native client and deliberately
+resume notes. Two projects, worktrees or native connections do not share ownership.
 
-Ordinary editors do not participate in a shared compare-and-swap protocol. An
-external process can still race the tiny interval between a final revision check
-and filesystem rename. Avoid intentionally saving the same section at exactly the
-same moment in two editors. Prior app versions and recovery text are retained; this
-is not a guarantee against arbitrary concurrent filesystem writers or power loss.
+The service binds loopback and checks authenticated capabilities, Host and Origin.
+Markdown is sanitized and remote images are disabled. The browser cannot impersonate
+the native transport. This does not protect against malicious software running as
+your OS user. Session/browser storage is private, not application-encrypted.
 
-After an interrupted provider request, the app exposes uncertainty and does not
-replay it. Inspect recovery, provider state where available, and any executed target
-changes before acknowledging. The next turn then starts a fresh provider thread
-from current public context. A normal completed session resumes its provider ID.
+**Tune** is invoked deliberately. It presents versioned, evidence-backed proposals
+for acceptance, editing, rejection or deferral. Personal preferences, project
+decisions, shared methods and interface code remain distinct. No silent self-rewrite.
+The canonical skills are shared symlinks; `sprint-prompt` remains the explicit
+project-file handoff workflow. Relentless Print does not invoke it implicitly.
 
-Browser access requires a random capability with strict host/origin checks. Markdown
-is sanitized and remote images are not loaded. This protects against arbitrary
-websites and unauthenticated local requests, not malicious software running as your
-own OS user that can read your private files. Browser recovery buffers are local to
-that browser origin and are not encrypted by this application.
+## Install, update and rollback
 
-## Install, update and undo
-
-Requires Node 22+ and installed, authenticated Codex and/or Claude clients. From this
-repository, install locked project dependencies with `npm ci`, then:
+Requires Node 22+, WezTerm for terminal tab/focus controls, and installed authenticated
+native clients. From this existing checkout:
 
 ```sh
-node scripts/install.mjs --dry-run --adopt-reviewed
-node scripts/install.mjs --adopt-reviewed
+npm ci
+node scripts/install.mjs --dry-run
+node scripts/install.mjs
 relentless doctor
 ```
 
-Individual skill links point directly to `skills/`. The installer backs up inspected
-originals and refuses unknown conflicts. No sudo, global dependency upgrades or
-shell configuration edits. After moving the repository, rerun its installer.
+The installer verifies canonical skill links and adds one **user-scope** MCP server
+to each client. It preserves unrelated servers, permissions and configuration.
+Backups, dry-run, diagnostics, repeat installation, relocation and rollback are
+supported. It refuses unmanaged name collisions or conflicting edits. Codex approves
+only four scoped interaction tools; none can originate Build. Claude's explicitly invoked skill allows only those same interaction tools;
+other native approvals remain unchanged.
+Restart already-running clients once after installation so they discover the server.
+Future interviews need no wrapper or startup flags. Rerun the installer after moving
+the checkout or changing the Node installation.
 
-To undo: stop the app with `relentless stop`, then run `relentless uninstall`.
-This removes managed links and restores previous installations. Sessions, preferences,
-manifest and recovery remain on disk. See [skill provenance](docs/skill-provenance.md)
-for dry-run rollback and interrupted-installer recovery.
+To undo only MCP registration, run
+`node scripts/install-bridge.mjs --dry-run --rollback`, then repeat without
+`--dry-run`. To undo the complete installation, use `relentless uninstall` (or
+`node scripts/install.mjs --rollback`). It restores managed prior installations
+while retaining notes, prompts, preferences and backups. Restart clients afterward.
+Stop an idle local UI server with `relentless stop`; do not interrupt other active
+interviews just to undo links.
 
-## Verification and current limits
+## Verification
 
-Run `npm test` and `npm run check`. Live opt-in scripts use disposable synthetic
-projects: `node scripts/live-smoke.mjs codex|claude` and
-`node scripts/live-build.mjs codex|claude`. They use real authenticated inference.
-`node scripts/browser-dogfood.mjs` runs the real Codex browser workflow;
-`node scripts/browser-questions.mjs mock|claude` checks question cards and external
-answers. Browser scripts use an isolated Chrome profile, never your personal profile.
-See [evidence](docs/evidence.md) for actual runs and [compatibility](docs/compatibility.md)
-for protocol versions, supported APIs and platform limits.
+`npm test` and `npm run check` cover deterministic state, permission, storage and
+installation contracts. Opt-in scripts use real authenticated clients and fresh
+browser contexts with disposable projects:
 
-The Codex App Server is experimental and its custom permission profiles are beta.
-The conservative app profile keeps `.git` and client configuration read-only; target
-commits or broader permissions need an explicitly authorized native execution session.
-Claude uses per-tool approvals for edits and sandboxed commands. Ordinary conversational
-questions are always supported; native structured cards depend on provider behavior.
-No behavioral test establishes your subjective satisfaction. Use Tune after real use.
+```sh
+node scripts/attached-live.mjs codex 135
+node scripts/attached-live.mjs claude 135
+node scripts/attached-live.mjs claude 150 --background
+node scripts/attached-browser.mjs
+node scripts/attached-live.mjs codex 0 --build
+node scripts/attached-live.mjs claude 0 --build
+node scripts/helpers-live.mjs codex
+node scripts/helpers-live.mjs claude
+```
+
+See [evidence](docs/evidence.md) for exact observed results and limitations,
+[compatibility](docs/compatibility.md) for native contracts, and
+[installation provenance](docs/skill-provenance.md) for original skill rollback.
+Native tools outside the bridge retain their normal permissions: interview-only
+behavior there is skill guidance, not a bridge-imposed sandbox. Behavioral evaluations
+and synthetic fixtures do not establish subjective satisfaction or universal model
+judgment. Use Tune after real use.
+
+The live native CLI/browser loops, both answer helpers, and Claude's enabled native
+background-task mechanism passed. Full human-operated WezTerm discussion/return
+remains unverified: unattended interactive attempts did not reach the bridge within
+their test limit. Exact pane activation and deterministic terminal ownership/return
+checks passed; private helper discussion in the sidecar is live-tested. See the
+evidence record before treating interactive terminal behavior as certified.

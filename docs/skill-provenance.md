@@ -17,7 +17,7 @@ settled decisions, epistemic distinctions, evidence and a final one-line kickoff
 The Claude copy had an additional explicit thinking-aloud scenario; the Codex copy
 was more concise. The shared version preserves those behaviors and the useful
 fields from both sets of scenarios, removes client-specific model names, and
-separates Relentless's unsaved Print control from an explicitly requested saved
+separates Relentless's private working-prompt Print control from an explicitly requested saved
 sprint brief. It does not silently interpret Print as permission to write a file.
 
 The inventory tree hashes below include sorted relative names, types, file lengths,
