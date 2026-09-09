@@ -43,8 +43,14 @@ They are neither authorization nor a worker scheduler or watchdog.
 
 [Codex MCP](https://developers.openai.com/codex/mcp) documents user configuration
 and the default 60-second tool timeout. The installer sets this server's timeout to
-1800 seconds; each wait lasts at most 1500 seconds. Idle expiration returns a pending
-state for another long wait, not model polling every few seconds.
+1800 seconds. The HTTP bridge bounds each wait to 240 seconds, including requests
+using the retained 1500-second schema maximum. The installed Node 25.2.1 fetch
+implementation has a 300-second default response-header timeout; the shorter
+server interval avoids holding headers beyond that budget. Idle expiration returns
+the existing unauthorized pending state for another long wait on the same
+attachment. No connection retry or event replay is introduced. A server reload
+applies this cap to already-running MCP clients; their old description may remain
+until an ordinary client restart, but their parameter schema remains compatible.
 
 [Claude MCP](https://code.claude.com/docs/en/mcp) documents a per-server hard timeout,
 a 30-minute stdio idle window in these versions, and interactive main-conversation

@@ -4,7 +4,7 @@ description: Think through a project conversationally, preserve decisions in a l
 disable-model-invocation: true
 allowed-tools: mcp__relentless__open_interview, mcp__relentless__publish_interview, mcp__relentless__await_interview, mcp__relentless__attachment_status
 metadata:
-  protocol-version: "2.0.1"
+  protocol-version: "2.0.2"
 ---
 
 # Relentless
@@ -76,6 +76,9 @@ inspection. The MCP bridge does not sandbox all other native tools. No implement
 remote-machine access, heavy jobs or configuration writes without explicit authority.
 
 Receive replies and controls with `await_interview`, using its default long wait.
+Each HTTP wait has a four-minute idle limit, even when a longer waitMs was requested,
+so idle interviews stay below the native HTTP client's response-header timeout.
+This transport interval does not end the interview or grant authority.
 Acknowledge each delivered event ID. Acknowledgment can use waitMs 1 as a single
 transport operation before thinking; do not use short waits as a polling loop.
 After an idle `pending` result, issue another long wait on the SAME attachment.

@@ -418,3 +418,57 @@ No native client reinstall/restart, project Build, helper, or implementation wor
 launch was part of this live check. The real answer/Build round trip and concurrent
 execution remain to be dogfooded; the synthetic authority tests are not a claim
 that those portfolio operations have already completed.
+
+## 2026-09-09: idle attached HTTP wait exceeds the fetch header budget
+
+The root dogfood orchestrator reported a real installed native `await_interview`
+failing after several minutes with `isError: true` and `fetch failed`. Its immediate
+native status check retained the same attached session and unanswered question,
+with no prompt or pending control. No private session contents or identifiers are
+reproduced here. The error itself did not expose its underlying timeout cause.
+
+Source inspection established a concrete mismatch: `connection.api` uses built-in
+fetch with no timeout dispatcher override; `server.mjs` originally sent no response
+headers until `Attachments.wait` returned, whose default is 1,500,000 ms. Executable
+inspection on Node v25.2.1 / Undici 7.16.0 found the bundled assignment
+`this[kHeadersTimeout] = headersTimeout != null ? headersTimeout : 3e5;` in
+`process.binding('natives')['internal/deps/undici/undici']`. The 25-minute idle wait
+therefore exceeded that client's five-minute response-header budget. This explains
+the observed failure consistently, although the original error did not retain the
+inner exception and its exact elapsed time was not captured.
+
+The authenticated HTTP await route now caps each request at 240,000 ms and returns
+the existing unauthorized `pending` result on expiry. Short caller waits remain
+supported; the schema's previous maximum remains compatible. A server-start fixture
+option may shorten, but never raise, this cap. Attachment delivery, ownership,
+acknowledgment, question state and exact prompt/target authorization are unchanged.
+No retry, replay, provider, dependency or scheduler was added. The canonical skill
+2.0.2 and tool description state the bounded interval and same-attachment continuation.
+
+Verification performed by the implementation worker:
+
+- Before the runtime fix, the new real HTTP fixture using unchanged `api()` and
+  default await failed with `TimeoutError` at its shortened two-second client
+  deadline, exit 1. The cancellation fixture already passed. This is a scaled
+  regression of header withholding, not a second five-minute production run.
+- After the fix, `node --test test/bridge-wait.test.mjs`: **2/2 passed**, exit 0.
+  Short server intervals exercised default and maximum requested waits, idle
+  `pending` with an identical session/question snapshot, continuation into the
+  original answer, explicit acknowledgment, and no redelivery of that answer.
+  A wrong-target Build was rejected; the exact prompt/revision/target was delivered
+  as authority once, an unacknowledged repeat was `handback-uncertain` without
+  authority, and acknowledgment finished without replay or an app-owned provider.
+- Real HTTP cancellation released the server's waiter without ending the session
+  or consuming an event. The identical question then received an answer through
+  a fresh wait on the same attachment and acknowledged it successfully.
+- `npm test`: **87/87 passed**, exit 0. `npm run check`: JavaScript syntax, skill
+  metadata and whitespace passed, exit 0.
+
+No live session was mutated, no installed MCP process was restarted and no service
+was reloaded by the worker. Only the shared server needs a safe idle reload; already
+loaded MCP clients call `connection()` afresh and use the unchanged route/schema.
+Existing recovery rules still apply: a service restart disconnects unfinished
+attachments and revokes unacknowledged Build; the root must inspect and deliberately
+reopen the same owned session before waiting again. No automatic authority recovery
+was introduced. Native four-minute idle continuation after integration is a separate
+live acceptance check, not claimed by the shortened HTTP fixtures.

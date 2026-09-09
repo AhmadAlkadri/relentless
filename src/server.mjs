@@ -6,7 +6,11 @@ import { Store, dataHome, Fault, hash, atomic, scopeHash, json } from './storage
 import { Workspace, checkProject } from './service.mjs';
 import { repo, protocol } from './protocol.mjs';
 
-export async function startServer({ root = dataHome(), port = 0 } = {}) {
+export async function startServer({ root = dataHome(), port = 0, bridgeWaitMs = 240000 } = {}) {
+  // Node fetch's default response-header budget is 300 seconds. Bound each HTTP
+  // wait below that deadline; the native caller continues on an idle pending
+  // result. Fixtures may shorten this interval, never increase it.
+  const bridgeWaitLimit = Math.max(1, Math.min(Number(bridgeWaitMs) || 240000, 240000));
   const store = new Store(root, repo), token = randomBytes(32).toString('hex'), bridgeToken = randomBytes(32).toString('hex');
   const lock = path.join(store.root, 'server.lock');
   try { const fd = fs.openSync(lock, 'wx', 0o600); fs.writeFileSync(fd, String(process.pid)); fs.closeSync(fd); }
@@ -43,7 +47,10 @@ export async function startServer({ root = dataHome(), port = 0 } = {}) {
         if (name === 'open_interview') result = app.attachments.open(body.owner, body);
         else if (name === 'publish_interview') result = app.attachments.publish(body.owner, body);
         else if (name === 'attachment_status') result = app.attachments.snapshot(app.attachments.state(body.session, body.owner));
-        else if (name === 'await_interview') { const controller = new AbortController(); res.on('close', () => controller.abort()); result = await app.attachments.wait(body.owner, body, controller.signal); }
+        else if (name === 'await_interview') {
+          const controller = new AbortController(); res.on('close', () => controller.abort());
+          result = await app.attachments.wait(body.owner, { ...body, waitMs: Math.min(Number(body.waitMs) || bridgeWaitLimit, bridgeWaitLimit) }, controller.signal);
+        }
         else if (name === 'disconnect') { app.attachments.disconnect(body.owner); result = { disconnected: true, authorized: false }; }
         else throw new Fault('Unknown bridge operation.', 404);
         respond(200, result); return;
