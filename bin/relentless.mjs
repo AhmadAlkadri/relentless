@@ -43,9 +43,9 @@ try {
       const s = await api(state, `sessions/${id}`);
       if (command === 'pause') console.log(await api(state, `sessions/${id}/pause`, {}));
       else { if (command === 'build') console.log(`Build target: ${s.meta.project}\nSaved scope:\n${s.values?.brief}\n${s.values?.decisions}\nPermissions: selected project only; no publication, spending, destructive operations or global configuration changes. Ordinary approvals remain in the workspace.`);
-        await api(state, `sessions/${id}/turn`, { action: command === 'where' ? 'summary' : command, revision: s.revision, scope: s.scope, requestId: randomUUID() }); open(state, id); }
+        await api(state, `sessions/${id}/turn`, { action: command === 'where' ? 'summary' : command, revision: s.revision, scope: s.scope, promptRevision: s.prompt?.revision, target: s.meta.project, requestId: randomUUID() }); open(state, id); }
     }
-    else if (['print', 'portable', 'path'].includes(command)) { const s = await api(state, `sessions/${id}`); if (command === 'path') console.log(s.path); else console.log((await api(state, `sessions/${id}/${command === 'portable' ? 'export' : 'print'}`, { revision: s.revision })).text); }
+    else if (['print', 'portable', 'path'].includes(command)) { const s = await api(state, `sessions/${id}`); if (command === 'path') console.log(s.path); else { const result = await api(state, `sessions/${id}/${command === 'portable' ? 'export' : 'print'}`, { revision: s.revision }); console.log(result.text || result.message); } }
     else open(state, command === 'open' ? '' : id || '', command === 'tune');
   } else console.log('Usage: relentless [new --project PATH --backend codex|claude | resume ID | interview ID | where ID | build ID | pause ID | tune ID | path ID | print ID | portable [ID] | doctor | stop | uninstall]\nOptions: --no-open, --title TEXT, --context-stdin. No shell configuration changes are needed.');
 } catch (e) { console.error(`Relentless: ${e.message}`); process.exitCode = 1; }

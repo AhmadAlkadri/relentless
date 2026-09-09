@@ -7,6 +7,7 @@ import { Store, hash, renderDocument, parseDocument, replaceSection, publicConte
 import { control, protocol } from '../src/protocol.mjs';
 import { Workspace, preferenceChange } from '../src/service.mjs';
 import { randomUUID } from 'node:crypto';
+import { contextRevision } from '../src/attachment.mjs';
 import { providers } from '../src/providers.mjs';
 
 function fixture() { const root = fs.mkdtempSync(path.join(os.tmpdir(), 'relentless-test-')); const store = new Store(path.join(root, 'private')); const project = path.join(root, 'project'); fs.mkdirSync(project); fs.writeFileSync(path.join(project, 'README.md'), 'Synthetic project'); return { root, store, project, app: new Workspace(store) }; }
@@ -24,10 +25,11 @@ test('Markdown round trips Unicode, fences, long drafts and external rename', ()
 test('partial documents remain readable and app refuses to overwrite', () => {
   const { store } = fixture(); const s = store.create(); fs.writeFileSync(s.path, '# Partial editor write\n```'); const invalid = store.read(s.id); assert.equal(invalid.values, null); assert.match(invalid.raw, /Partial/); assert.throws(() => store.append(s.id, 'Agent', 'response')); assert.equal(fs.readFileSync(s.path, 'utf8'), invalid.raw);
 });
-test('private draft and scratchpad never enter public context or Print and Print is pure', () => {
+test('private draft and scratchpad never enter public context; Print reuses the canonical prompt', async () => {
   const { store, app, project } = fixture(); let s = store.create({ project }); s = store.update(s.id, 'draft', 'PRIVATE DRAFT', s.revision); s = store.update(s.id, 'scratchpad', 'PRIVATE SCRATCH', s.revision);
+  app.prompts.publish(s.id, { text: '# Acceptance evidence\nSynthetic useful prompt.', sourceRevision: contextRevision(s), ready: false });
   const before = fs.readFileSync(s.path), metadata = fs.readFileSync(store.file(s.id, 'json')), skill = protocol().version, pref = app.preferences().version;
-  const result = app.print(s.id, s.revision);
+  const result = await app.print(s.id, s.revision);
   assert.ok(!result.text.includes('PRIVATE')); assert.ok(!publicContext(s.values).includes('PRIVATE')); assert.match(result.text, /Acceptance evidence/);
   assert.deepEqual(fs.readFileSync(s.path), before); assert.deepEqual(fs.readFileSync(store.file(s.id, 'json')), metadata); assert.equal(protocol().version, skill); assert.equal(app.preferences().version, pref); assert.equal(fs.readFileSync(path.join(project, 'README.md'), 'utf8'), 'Synthetic project');
 });
@@ -107,7 +109,8 @@ test('an execution question records the exchange without mutating authorized sco
   const original = providers.mock; t.after(() => { providers.mock = original; });
   providers.mock = async ({ interact }) => { await interact({ kind: 'question', questions: [{ id: 'detail', question: 'Clarify this bounded detail?' }] }); return { text: 'Scope preserved.' }; };
   const { store, app, project } = fixture(); const s = store.create({ backend: 'mock', project }); const scope = scopeHash(s.values, s.meta.project);
-  await app.begin(s.id, { action: 'build', revision: s.revision, scope, requestId: randomUUID() }); const done = app.active.done;
+  app.prompts.publish(s.id, { text: '# Synthetic scope\nClarify a bounded detail.', sourceRevision: contextRevision(s), ready: true });
+  await app.begin(s.id, { action: 'build', revision: s.revision, scope, promptRevision: app.prompts.view(s.id).revision, target: s.meta.project, requestId: randomUUID() }); const done = app.active.done;
   await waitFor(() => app.active.pending); assert.equal(scopeHash(store.read(s.id).values, s.meta.project), scope);
   app.answer(s.id, { pendingId: app.active.pending.display.id, kind: 'question', answers: { detail: 'Keep the agreed default.' } }); await done;
   assert.equal(store.meta(s.id).status, 'idle'); assert.equal(scopeHash(store.read(s.id).values, s.meta.project), scope);

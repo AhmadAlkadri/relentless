@@ -12,7 +12,7 @@ Use the shared method in `../relentless/SKILL.md`; do not maintain another
 interview protocol here. Native Codex invocation is `$tune`; Claude Code invocation
 is `/tune`. In the workspace `/tune` is the same deliberate review control.
 
-Open the selected session with `relentless tune <session-id>`. Review its relevant
+In attached mode, handle the Tune control in the original native conversation and publish the review in the sidecar. Do not launch another reviewer. In standalone mode, open the selected session with `relentless tune <session-id>`. Review its relevant
 exchanges and explicit feedback. Without a selected session, use the current
 conversation as review context and label that limitation. Scratchpad and unsent
 drafts remain private unless the user explicitly includes them.

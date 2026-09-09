@@ -7,7 +7,7 @@ import { Workspace, checkProject } from './service.mjs';
 import { repo, protocol } from './protocol.mjs';
 
 export async function startServer({ root = dataHome(), port = 0 } = {}) {
-  const store = new Store(root, repo), token = randomBytes(32).toString('hex');
+  const store = new Store(root, repo), token = randomBytes(32).toString('hex'), bridgeToken = randomBytes(32).toString('hex');
   const lock = path.join(store.root, 'server.lock');
   try { const fd = fs.openSync(lock, 'wx', 0o600); fs.writeFileSync(fd, String(process.pid)); fs.closeSync(fd); }
   catch (e) { const pid = Number(fs.readFileSync(lock, 'utf8')); let alive = false; try { process.kill(pid, 0); alive = true; } catch {} if (alive) throw new Error('A Relentless server already owns this storage directory.'); fs.unlinkSync(lock); const fd = fs.openSync(lock, 'wx', 0o600); fs.writeFileSync(fd, String(process.pid)); fs.closeSync(fd); }
@@ -28,7 +28,8 @@ export async function startServer({ root = dataHome(), port = 0 } = {}) {
       const url = new URL(req.url, origin);
       if (req.method === 'GET' && staticFiles[url.pathname]) { const [file, type] = staticFiles[url.pathname]; res.writeHead(200, { 'Content-Type': `${type}; charset=utf-8` }); res.end(fs.readFileSync(path.join(repo, file))); return; }
       const supplied = req.headers.authorization?.replace(/^Bearer /, '') || '';
-      if (supplied.length !== token.length || !timingSafeEqual(Buffer.from(supplied), Buffer.from(token))) throw new Fault('Open this workspace through the local relentless command.', 401);
+      const bridgeRoute = url.pathname.startsWith('/api/bridge/'), expected = bridgeRoute ? bridgeToken : token;
+      if (supplied.length !== expected.length || !timingSafeEqual(Buffer.from(supplied), Buffer.from(expected))) throw new Fault('Open this workspace through the local relentless command.', 401);
       if (req.method !== 'GET' && req.headers.origin !== origin) throw new Fault('A matching local Origin is required.', 403);
       let body = {};
       if (req.method === 'POST') {
@@ -36,7 +37,18 @@ export async function startServer({ root = dataHome(), port = 0 } = {}) {
         let raw = ''; for await (const chunk of req) { raw += chunk; if (Buffer.byteLength(raw) > 2_100_000) throw new Fault('Request too large.', 413); }
         try { body = JSON.parse(raw || '{}'); } catch { throw new Fault('Invalid JSON.'); }
       }
-      if (url.pathname === '/api/state' && req.method === 'GET') { const items = store.worklist(); respond(200, { sessions: store.list(), worklist: items, worklistRevision: hash(JSON.stringify(items)), root: store.root, protocol: protocol().version, active: app.active?.id, testMode: process.env.RELENTLESS_TEST === '1', preferences: app.preferences() }); return; }
+      if (bridgeRoute && req.method === 'POST') {
+        const name = url.pathname.slice('/api/bridge/'.length); let result;
+        if (!/^[a-f0-9-]{36}$/.test(body.owner || '')) throw new Fault('Native connection ownership is required.');
+        if (name === 'open_interview') result = app.attachments.open(body.owner, body);
+        else if (name === 'publish_interview') result = app.attachments.publish(body.owner, body);
+        else if (name === 'attachment_status') result = app.attachments.snapshot(app.attachments.state(body.session, body.owner));
+        else if (name === 'await_interview') { const controller = new AbortController(); res.on('close', () => controller.abort()); result = await app.attachments.wait(body.owner, body, controller.signal); }
+        else if (name === 'disconnect') { app.attachments.disconnect(body.owner); result = { disconnected: true, authorized: false }; }
+        else throw new Fault('Unknown bridge operation.', 404);
+        respond(200, result); return;
+      }
+      if (url.pathname === '/api/state' && req.method === 'GET') { const items = store.worklist(); respond(200, { sessions: store.list().map(m => { if (!m.attachment) return m; const { owner, ...attachment } = m.attachment; return { ...m, attachment }; }), worklist: items, worklistRevision: hash(JSON.stringify(items)), root: store.root, protocol: protocol().version, active: app.active?.id, testMode: process.env.RELENTLESS_TEST === '1', preferences: app.preferences() }); return; }
       if (url.pathname === '/api/new' && req.method === 'POST') { if (body.backend === 'mock' && process.env.RELENTLESS_TEST !== '1') throw new Fault('Synthetic backend is disabled.'); respond(200, store.create(body)); return; }
       if (url.pathname === '/api/worklist' && req.method === 'POST') { respond(200, store.saveWorklist(body.items, body.revision)); return; }
       if (url.pathname === '/api/stop' && req.method === 'POST') { if (app.active) app.pause(app.active.id); respond(200, { stopping: true }); setTimeout(() => close(), 2000).unref(); return; }
@@ -55,7 +67,9 @@ export async function startServer({ root = dataHome(), port = 0 } = {}) {
       else if (operation === 'turn') result = await app.begin(id, body);
       else if (operation === 'answer') result = app.answer(id, body);
       else if (operation === 'pause') result = app.pause(id);
-      else if (operation === 'print') result = app.print(id, body.revision);
+      else if (operation === 'print') result = await app.print(id, body.revision);
+      else if (operation === 'prompt-edit') result = app.prompts.edit(id, body);
+      else if (operation === 'return') result = app.attachments.user(id, { action: 'return', requestId: body.requestId });
       else if (operation === 'export') result = app.export(id);
       else if (operation === 'acknowledge') result = app.acknowledge(id);
       else if (operation === 'reconcile') result = await app.reconcile(id);
@@ -71,11 +85,11 @@ export async function startServer({ root = dataHome(), port = 0 } = {}) {
   catch (e) { fs.unlinkSync(lock); throw new Error(`Cannot bind the saved local port ${preferredPort}: ${e.code}. Stop the conflicting process or deliberately select a different port with relentless serve --port PORT.`); }
   origin = `http://127.0.0.1:${server.address().port}`;
   atomic(listenerFile, JSON.stringify({ port: server.address().port }));
-  const stateFile = path.join(store.root, 'server.json'); atomic(stateFile, JSON.stringify({ pid: process.pid, origin, token, root: store.root }));
+  const stateFile = path.join(store.root, 'server.json'); atomic(stateFile, JSON.stringify({ pid: process.pid, origin, token, bridgeToken, root: store.root }));
   // Poll the actual Markdown inode, including replace/rename saves, to revoke a
   // running Build if its agreed scope is edited outside the browser.
   const watcher = setInterval(() => { if (app.active?.mode === 'build') { try { const s = store.read(app.active.id); checkProject(s.meta); if (!s.values || scopeHash(s.values, s.meta.project) !== app.active.scope) app.pause(s.id); } catch { app.pause(app.active.id); } } }, 500);
   let closed = false;
   async function close() { if (closed) return; closed = true; clearInterval(watcher); if (app.active) { app.pause(app.active.id); await Promise.race([app.active.done, new Promise(r => setTimeout(r, 5000))]); } server.closeAllConnections(); await new Promise(r => server.close(r)); if (Number(fs.readFileSync(lock, 'utf8')) === process.pid) fs.unlinkSync(lock); if (fs.existsSync(stateFile)) fs.unlinkSync(stateFile); }
-  return { server, app, store, origin, token, close };
+  return { server, app, store, origin, token, bridgeToken, close };
 }

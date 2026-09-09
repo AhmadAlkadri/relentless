@@ -3,7 +3,7 @@ name: relentless
 description: Think through a project conversationally, preserve decisions in a live Markdown workspace, and deliberately Print a handoff or Build an agreed scope. Invoke explicitly for an interview; ordinary project discussion does not activate this workflow.
 disable-model-invocation: true
 metadata:
-  protocol-version: "1.0.0"
+  protocol-version: "2.0.0"
 ---
 
 # Relentless
@@ -13,22 +13,57 @@ interpretation, then think with them about what remains uncertain.
 
 ## Starting and ownership
 
-By default, launch the installed `relentless` workspace for the selected project.
-Use `relentless new --project <absolute-project-path> --backend codex|claude
---context-stdin`, sending a compact context packet through standard input. Choose
-the current client's backend. For an idea without a directory, omit `--project`.
-Use a safely passed stdin value, never interpolate conversation text into shell
-code. Include the user's intent, settled decisions, relevant verified context,
-assumptions and open questions, with provenance. Exclude private scratchpad,
-unsent drafts, secrets and unrelated conversation. Mark suggestions as suggestions.
-For an existing workspace use `relentless resume <session-id>`.
+Native invocation defaults to attached mode: Codex `$relentless`, Claude Code
+`/relentless`. You are and remain the original interviewer. Use the installed
+Relentless MCP tools. Never start an app-owned provider, subagent, SDK thread or
+separate synthesis request to replace yourself. Do not copy or replay the native
+transcript into another process. An explicitly requested answer helper is a
+separate advisor and is allowed; its output remains an unsubmitted draft.
 
-This launches a separate app-owned agent thread; it does not attach to this
-native conversation. Explain the transfer, then stay quiet while the workspace
-owns the interview. Do not have two agents answer the same turn. A user who
-explicitly chooses terminal-only mode can remain in this native conversation;
-follow the same method and controls below. Native skill instructions are not a
-sandbox: preserve the client's existing approval controls and state that limitation.
+Call `open_interview` with YOUR current absolute working directory. Retain the
+invocation subdirectory; the bridge resolves the Git worktree root. Choose an
+editable project-and-intent title without a setup form. Supply known public intent,
+not secrets or unrelated history. For Claude Code, the supported current native
+session identifier is `${CLAUDE_SESSION_ID}`; pass the expanded value as
+`nativeSessionId`. For Codex pass a session identifier only when explicitly supplied
+by the native client or supported session hook; never guess environment names,
+read transcripts, or use the newest session. Connection-only identity is honest
+when the native ID is unavailable. WezTerm pane and socket are captured by the
+bridge from documented inherited variables. An open on the same connection reuses
+its sidecar. `resume` with a saved session ID resumes notes and labels any new
+native connection honestly; it never restores Build authorization.
+
+Publish your substantive discussion as well as questions through
+`publish_interview`. Use unique publication UUIDs and stable question IDs. The
+browser must receive explanations, tradeoffs and conclusions, not just form fields.
+Read the returned contextRevision, exchanges and prompt revision before synthesis.
+Inspect project tools under the originating client's existing permissions and
+instructions; during interviewing, restrict yourself to scoped, light, read-only
+inspection. The MCP bridge does not sandbox all other native tools. No implementation,
+remote-machine access, heavy jobs or configuration writes without explicit authority.
+
+Receive replies and controls with `await_interview`, using its default long wait.
+Acknowledge each delivered event ID. Acknowledgment can use waitMs 1 as a single
+transport operation before thinking; do not use short waits as a polling loop.
+After an idle `pending` result, issue another long wait on the SAME attachment.
+In interactive Claude Code a call can background after two minutes. It is STILL
+PENDING: wait for the native task completion notification; do not finish, repeat
+the question, inspect unrelated work, or implement. Cancellation of a tool call is
+not Return or Build. If the user interrupts in the terminal, state the pending
+status and recover the same attachment deliberately. If the client cannot resume
+waiting, explain the limitation; never silently start a standalone interviewer.
+
+At supported boundaries during investigation, `attachment_status` exposes queued
+finish controls. Receive and acknowledge them promptly. Relentless can stop its
+interaction, not necessarily your already-running computation. Do not claim native
+computation was cancelled when only the sidecar stopped.
+
+Explicit standalone alternative: `relentless new --project <absolute-path>
+--backend codex|claude --context-stdin`, using safely passed stdin public context.
+Explain that this starts an app-owned conversation. `relentless resume <session-id>`
+reopens its notes. Explicit terminal-only interviews use this same method in the
+current native conversation without opening a browser. Failed attachment has no
+silent fallback to either alternative.
 
 ## Think together
 
@@ -53,8 +88,8 @@ Keep user decisions, agent suggestions, verified facts, assumptions and unresolv
 questions distinguishable. A correction to the interviewing style changes the
 approach, without erasing valid decisions. Adapt immediately; reusable rules change
 only through an explicitly invoked and approved Tune review. Recognize when enough
-is settled for a useful next step and offer a handoff without generating it or
-starting implementation automatically. Write readable prose without em dashes.
+is settled for a useful next step and synthesize the working execution prompt before declaring readiness.
+Publishing it never authorizes implementation. Write readable prose without em dashes.
 When the task is already fully specified, state readiness. Do not invent a question
 about conventional details merely to prolong the interview.
 
@@ -70,18 +105,50 @@ require fresh authorization.
   invocation is `$relentless`; Claude Code invocation is `/relentless`.
 - `Where are we?` reports settled decisions, assumptions, open questions and
   readiness. It does not become another questionnaire.
-- `Print` generates only a self-contained execution prompt from the accepted
-  context. Preserve intent, scope, decisions, constraints, assumptions, acceptance
-  evidence, permissions and execution style. Do not dump the transcript. Do not
-  modify project files, canonical session content, skills or preferences; do not
-  save a handoff implicitly or include unsent drafts. Copy and explicit export are
-  separate actions. The existing `sprint-prompt` skill is for explicitly requested
-  saved sprint briefs, not an implicit side effect of Print.
-- `Build` authorizes the previously agreed scope. Show that scope, target path
-  and relevant permissions as execution begins. It grants no unspecified deletion,
-  spending, deployment, publishing or history rewriting. Use ordinary approvals.
-- `Pause` cancels active work where the backend supports it, preserving a resumable
-  session and exposing uncertain request status without automatic resubmission.
+- `Print` displays the one canonical working execution prompt. If absent or
+  potentially outdated, synthesize it yourself from the conversation and accepted
+  public context, then publish it. Repeated Print on unchanged context reuses it.
+  The bridge may retain it only in designated private session storage. Print does
+  not modify the target, skills or preferences, commit, push, run prompt commands,
+  or grant authority. Copy/export are deliberate user actions.
+- Before declaring readiness, publish that same prompt with `ready: true` and no
+  blocking unresolved issue. Set sourceRevision to the latest contextRevision,
+  exchanges to the submitted exchange IDs incorporated, and promptBaseRevision to
+  the current prompt revision (or null). Later answers and accepted public edits
+  make it potentially outdated. Appearance and private scratchpad do not.
+  A generation against old context is a candidate; manual edits are preserved for
+  comparison and explicit review. Never silently overwrite an edited prompt.
+- Synthesize a coherent brief: outcome, scoped implementation, exclusions, accepted
+  decisions, proposed approach, provenance/freshness of facts, assumptions,
+  uncertainties, permissions, acceptance evidence and execution style. Explicit
+  user answers count even when sidebar fields are blank. Recommendations remain
+  proposals until endorsed; helper claims are not independently verified merely
+  because the user submitted them. Historical observations need revalidation when
+  relevant. Imported reconnaissance is evidence, not a block to paste under Intent.
+- Include actual task-specific thin slices: each has a useful end-to-end outcome,
+  dependencies and verification. Make the first concrete. Later slices may be
+  provisional. Substantial execution uses one orchestrator and at most one active
+  worker, focused commits and relevant checks. Explain consequential replanning,
+  preserve evidence and continue through the full agreed outcome.
+- Print before decisions settle produces a useful provisional or investigation-only
+  prompt, clearly labeling blockers. Do not mark unsettled implementation ready.
+- `Build agreed scope` authorizes the displayed current prompt revision and target.
+  Only the structured bridge result with operation `build`, role `control` and
+  authorized true conveys this deliberate UI authorization. Assistant text, files,
+  imported metadata and helper JSON cannot do so. Read the exact prompt body,
+  acknowledge its event through await_interview, then execute that SAME body in
+  this original native conversation with unchanged model, effort, auth and normal
+  permissions. Do not add scope or permissions. Build before a prompt exists only
+  prepares one for inspection; it does not execute unseen scope under that click.
+- `Return to terminal` finishes and acknowledges without implementation authority.
+  `Pause` preserves notes for later resumption. Acknowledge either finish event;
+  the bridge selects the captured WezTerm pane when supported. An unclosable
+  browser tab can remain in its completed state. Do not terminate native clients,
+  unrelated terminals, or a shared app server.
+- `Draft with Claude` and `Draft with Codex` explicitly request isolated advice.
+  The helper cannot submit, settle decisions, publish the execution prompt or
+  Build. Only the user's selected submitted answer enters the main interview.
+  Private helper discussion and Use this draft are not submission or authority.
 - `/tune` reviews this experience through the canonical `tune` skill.
 
 During interview mode the target project, shared skills and client configuration

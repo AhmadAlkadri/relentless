@@ -13,7 +13,7 @@ let selected = fragment.get('session') || localStorage.getItem('relentless-last-
 let tuneOnOpen = fragment.get('tune') === '1';
 let state = null, current = null, busy = false, polling = false;
 let navigationSignature = '', conversationSignature = '', streamSignature = '', pendingSignature = '', tuneSignature = '', suggestionsSignature = '';
-let noticeTimer;
+let noticeTimer, awaitingPrint = false;
 const buffers = new Map();
 const sectionLabels = { brief: 'Working brief', decisions: 'Accepted decisions', facts: 'Verified facts', assumptions: 'Assumptions', questions: 'Current questions', scratchpad: 'Private scratchpad' };
 const defaults = { theme: 'system', size: 18, width: 760, focus: false };
@@ -50,7 +50,7 @@ async function api(route, body) {
 }
 function sessionApi(operation = '', body) { if (!selected) throw new Error('Choose a session first.'); return api(`sessions/${selected}${operation ? `/${operation}` : ''}`, body); }
 function cleanMarkdown(text) {
-  const publicText = String(text || '').replace(/```relentless-(?:state|tune|accepted)\s*\n[\s\S]*?\n```/g, '').replace(/```relentless-(?:state|tune|accepted)[\s\S]*$/, '');
+  const publicText = String(text || '').replace(/```relentless-(?:state|tune|accepted|question)\s*\n[\s\S]*?\n```/g, '').replace(/```relentless-(?:state|tune|accepted|question)[\s\S]*$/, '');
   const html = DOMPurify.sanitize(marked.parse(publicText, { breaks: false }), { ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'del', 'a', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'pre', 'code', 'hr', 'table', 'thead', 'tbody', 'tr', 'th', 'td'], ALLOWED_ATTR: ['href', 'title', 'start'], ALLOW_DATA_ATTR: false });
   const template = document.createElement('template'); template.innerHTML = html;
   for (const a of template.content.querySelectorAll('a')) {
@@ -110,6 +110,7 @@ function newSession(item = null) {
   }); } }, formField('A title for this thought', title), formField('Project directory (optional)', project, 'Ideas without repositories work too. Choose an existing, specific directory when you have one.'), formField('Think with', backend, 'A separate app-owned conversation uses the installed client. Nothing is sent until you start.'), formField('Working brief (optional)', context), el('div', { class: 'modal-actions' }, submit));
   openModal(item ? 'Start this thought' : 'A new thought', form); title.focus();
 }
+$('session-title').addEventListener('dblclick', () => { const title = el('input', { value: current.meta.title, maxLength: 250, 'aria-label': 'Interview title' }); openModal('Rename this interview', el('div', {}, title, button('Save title', async () => { await sessionApi('rename', { title: title.value }); closeModal(); await refreshSession(); }, { class: 'primary' }))); });
 $('new-button').addEventListener('click', () => newSession()); $('welcome-new').addEventListener('click', () => newSession());
 $('home-link').addEventListener('click', event => { event.preventDefault(); selected = null; current = null; localStorage.removeItem('relentless-last-session'); history.replaceState(null, '', location.pathname); renderSession(); renderNavigation(true); });
 $('nav-button').addEventListener('click', () => { const opened = document.body.classList.toggle('nav-open'); $('nav-button').setAttribute('aria-expanded', String(opened)); });
@@ -223,17 +224,21 @@ function compareSection(section) {
 function renderSession() {
   $('welcome').hidden = Boolean(current); $('session-view').hidden = !current; $('context-button').disabled = !current;
   if (!current) { $('mode-badge').textContent = 'Local workspace'; $('session-title').textContent = ''; return; }
-  const m = current.meta, active = Boolean(current.active), invalid = !current.values, interrupted = m.status === 'uncertain';
+  const m = current.meta, attached = m.attachment, ended = attached && ['built', 'returned', 'finished', 'disconnected', 'paused'].includes(attached.state), finishing = attached?.state === 'finishing', active = Boolean(current.active), invalid = !current.values, interrupted = m.status === 'uncertain';
   document.title = `${m.title} · Relentless`; $('session-title').textContent = m.title; $('session-target').textContent = m.project || 'An idea with room to develop. No project directory selected.';
   $('mode-badge').textContent = `${m.backend === 'mock' ? 'Synthetic' : m.backend === 'codex' ? 'Codex' : 'Claude'} · ${m.mode === 'build' ? 'Execution' : 'Read-only interview'}`; $('mode-badge').classList.toggle('executing', m.mode === 'build');
+  if (attached) $('mode-badge').textContent = `${attached.client === 'codex' ? 'Codex' : 'Claude'} · Attached interviewer`;
+  $('privacy-note').textContent = attached ? `This is your original native conversation’s sidecar. ${attached.nativeSessionId ? 'Native session identity captured.' : 'Continuity is tied to this live MCP connection; native session ID is unavailable.'} Answer helpers are separate and optional.` : 'Standalone: a separate app-owned conversation. Submitted public context goes to its provider. Drafts and scratchpad stay local.';
+  $('interview-button').hidden = Boolean(attached); $('return-button').hidden = !attached; $('return-button').disabled = ended || finishing;
+  if (ended || finishing) { $('session-alert').hidden = false; $('session-alert').textContent = ended ? `Interview ${attached.state}. Your record and working prompt are preserved. Return to your original terminal. Reopen Relentless there to resume.` : 'Finishing at the next native tool boundary. Native computation may still be running; no cancellation is claimed.'; }
   $('session-kicker').textContent = m.mode === 'build' ? 'MAKING THE AGREED SCOPE REAL' : 'THINKING TOGETHER';
   $('session-alert').hidden = !(invalid || m.error); $('session-alert').textContent = current.error || m.error || '';
   $('recovery-actions').hidden = !(interrupted || invalid || m.status === 'paused'); $('acknowledge-button').hidden = !interrupted; $('reconcile-button').hidden = !interrupted;
   $('interview-button').textContent = current.values?.conversation ? 'Resume interview' : 'Start interview';
-  for (const id of ['interview-button', 'summary-button', 'continue-button', 'tune-button', 'build-button']) $(id).disabled = busy || active || Boolean(state?.active) || interrupted || invalid;
+  for (const id of ['interview-button', 'summary-button', 'continue-button', 'tune-button', 'build-button']) $(id).disabled = busy || active || Boolean(state?.active) || interrupted || invalid || ended || finishing;
   $('build-button').disabled ||= !m.project || !current.values?.brief?.trim();
   $('print-button').disabled = busy || invalid; $('export-button').disabled = invalid;
-  $('pause-button').hidden = !active; $('pause-button').disabled = busy;
+  $('pause-button').hidden = !active && !attached; $('pause-button').disabled = ended || finishing; $('pause-button').disabled = busy || ended || finishing;
   const conversation = current.values?.conversation || '';
   if (conversation !== conversationSignature || !conversation && !$('conversation').hasChildNodes()) {
     if (!conversation) { $('conversation').replaceChildren(el('p', { class: 'empty-conversation', text: 'A good conversation starts with a little context. Start the interview, or add to the working brief first.' })); conversationSignature = ''; }
@@ -244,7 +249,9 @@ function renderSession() {
   $('thinking').hidden = !active; $('thinking-text').textContent = m.status === 'question' ? 'Waiting for your answer' : m.status === 'approval' ? 'Waiting for a tool approval' : m.mode === 'build' ? 'Working within the agreed scope…' : 'Thinking with you…';
   $('document-path').textContent = current.path;
   $('build-target').textContent = m.project || 'No target directory. Start a project-linked session to execute.';
-  const scopeText = `### Working brief\n\n${current.values?.brief || 'No scope recorded.'}\n\n### Accepted decisions\n\n${current.values?.decisions || 'No decisions recorded.'}\n\n### Facts and assumptions\n\n${[current.values?.facts, current.values?.assumptions].filter(Boolean).join('\n\n') || 'None recorded.'}\n\n### Open questions\n\n${current.values?.questions || 'None recorded.'}`;
+  const scopeText = current.prompt?.text || 'Prepare the working prompt with Print before execution. No scope is authorized yet.';
+  $('prompt-status').textContent = current.prompt ? `Revision ${String(current.prompt.revision || 'candidate').slice(0, 12)} · ${!current.prompt.current ? 'Potentially outdated' : current.prompt.ready ? 'Ready to Build' : 'Provisional / review required'}${current.prompt.manual ? ' · Edited by you' : ''}` : 'No working prompt yet';
+  if (awaitingPrint && current.prompt?.current) { awaitingPrint = false; reviewPrompt(); }
   if ($('build-scope').dataset.scope !== scopeText && renderMarkdown($('build-scope'), scopeText)) $('build-scope').dataset.scope = scopeText;
   const loaded = m.protocol ? m.protocol.slice(0, 12) : 'loaded on first turn'; $('protocol-info').textContent = `Method: ${loaded}. Current source: ${current.currentProtocol.slice(0, 12)}.${m.protocol && m.protocol !== current.currentProtocol ? ' The new method loads on the next turn boundary.' : ''} Provider session identifiers remain in the local metadata sidecar.`;
   renderPending(); renderTune(); renderSuggestions(); updateSaveSummary();
@@ -254,17 +261,33 @@ async function startTurn(action) {
   if (state?.active && state.active !== selected) throw new Error('Another session owns the active agent turn. Open it and pause or wait.');
   const b = editor('draft'); if (action === 'continue' && b.conflict) throw new Error('Review the externally changed answer before continuing. Your local answer is preserved.');
   const submitted = action === 'continue' ? b.text : '';
-  const reviewed = { revision: current.revision, scope: current.scope }, id = selected;
+  const reviewed = { revision: current.revision, scope: current.scope, promptRevision: current.prompt?.revision, target: current.meta.project }, id = selected;
   busy = true; renderSession();
   try {
-    await sessionApi('turn', { action, text: submitted, ...reviewed, requestId: crypto.randomUUID(), usePreferences: $('use-preferences').checked });
+    const response = await sessionApi('turn', { action, text: submitted, ...reviewed, requestId: crypto.randomUUID(), usePreferences: $('use-preferences').checked });
+    if (response.preparing) { awaitingPrint = true; notice(response.message); }
     if (action === 'continue' && selected === id) { if (b.text === submitted) b.text = ''; b.base = ''; b.dirty = b.text !== ''; b.conflict = false; rememberBuffer('draft', b); }
     if (selected === id) { await refreshState(); await refreshSession(); }
   } finally { busy = false; renderSession(); }
 }
 for (const [id, action] of [['interview-button', 'interview'], ['summary-button', 'summary'], ['continue-button', 'continue'], ['tune-button', 'tune'], ['build-button', 'build']]) $(id).addEventListener('click', () => run(() => startTurn(action)));
 $('pause-button').addEventListener('click', () => run(async () => { await sessionApi('pause', {}); notice('Pause requested. Completed text and recovery remain local.'); await refreshSession(); }));
-$('print-button').addEventListener('click', () => run(async () => { const result = await sessionApi('print', { revision: current.revision }); showText('Execution prompt', result.text, 'relentless-execution-prompt.md', `Generated only from saved public context (${result.revision.slice(0, 12)}). Drafts, scratchpad, and transcript are excluded. Nothing was saved or authorized.`); }));
+$('print-button').addEventListener('click', () => run(async () => { const result = await sessionApi('print', { revision: current.revision }); if (result.preparing) { awaitingPrint = true; notice(result.message); } else { await refreshSession(); reviewPrompt(); } }));
+$('review-prompt-button').addEventListener('click', () => run(() => current.prompt ? reviewPrompt() : $('print-button').click()));
+$('return-button').addEventListener('click', () => run(async () => { await sessionApi('return', { requestId: crypto.randomUUID() }); await refreshSession(); }));
+function reviewPrompt() {
+  const p = current.prompt; if (!p) return;
+  const revision = p.revision, sourceRevision = current.contextRevision;
+  const key = `relentless-prompt-edit:${selected}:${revision}`;
+  const area = el('textarea', { class: 'export-text', value: readLocal(key, p.text), 'aria-label': 'Working execution prompt', spellcheck: false });
+  area.addEventListener('input', () => writeLocal(key, area.value));
+  const ready = el('input', { type: 'checkbox', checked: p.ready });
+  const proposed = el('div');
+  for (const candidate of p.candidates || []) proposed.append(el('details', {}, el('summary', { text: `Proposed replacement · ${candidate.sourceRevision === sourceRevision ? 'current context' : 'older context'}` }), el('pre', { text: candidate.text }), button('Review replacement in editor', () => { writeLocal(key + ':previous', area.value); area.value = candidate.text; area.dispatchEvent(new Event('input')); ready.checked = false; notice('Previous editor text preserved locally. Review this proposal and its freshness before saving.'); })));
+  openModal('Working execution prompt', el('div', {}, el('p', { class: 'modal-help', text: `${p.path} · revision ${String(revision || 'candidate').slice(0,12)}. ${p.current ? '' : 'Potentially outdated: reconcile changed context before Build.'} Print and Build use this exact saved body. Saving here grants no execution authority.` }), area, proposed,
+    el('label', { class: 'checkbox-line' }, ready, ' This proposed scope is clear enough to begin; no blocking decisions remain'),
+    el('div', { class: 'modal-actions' }, button('Copy', () => copy(p.text)), button('Export saved .md…', () => showText('Export working execution prompt', p.text, 'relentless-execution-prompt.md')), button('Save reviewed prompt', async () => { await sessionApi('prompt-edit', { text: area.value, revision, sourceRevision, ready: ready.checked }); localStorage.removeItem(key); closeModal(); await refreshSession(); notice('Working prompt saved. Build is a separate deliberate action.'); }, { class: 'primary' }))));
+}
 $('export-button').addEventListener('click', () => run(async () => { const result = await sessionApi('export', {}); showText('Take the thought with you', result.text, 'relentless-chatgpt-context.md', 'Copy into a new ChatGPT conversation, or explicitly save and upload this Markdown. Generated from the canonical method and compact public context. Local skills do not automatically sync to ChatGPT web.'); }));
 $('copy-path-button').addEventListener('click', () => run(() => copy(current.path)));
 $('raw-toggle-button').addEventListener('click', () => { $('raw-editor-container').hidden = !$('raw-editor-container').hidden; $('raw-toggle-button').textContent = $('raw-editor-container').hidden ? 'Edit full Markdown' : 'Hide Markdown editor'; });
@@ -274,7 +297,7 @@ $('acknowledge-button').addEventListener('click', () => run(async () => { await 
 $('stop-button').addEventListener('click', () => { openModal('Close the local workspace?', el('div', {}, el('p', { text: 'The application will pause an active turn and stop its local server. Saved Markdown stays on disk. Unsaved text remains in this browser’s recovery storage. Run relentless to reopen.' }), el('div', { class: 'modal-actions' }, button('Keep thinking', closeModal), button('Stop application', async () => { await api('stop', {}); closeModal(); capability = null; sessionStorage.removeItem('relentless-capability'); notice('Application stopped. Run relentless to reopen your workspace.'); $('connection').textContent = 'Stopped'; }, { class: 'primary' })))); });
 
 function renderPending() {
-  const pending = current.active?.pending || (current.meta.status === 'uncertain' ? current.meta.pending : null), recovered = Boolean(pending && !current.active?.pending); const signature = `${pending?.id || ''}:${recovered}`;
+  const pending = current.meta.attachment?.question || current.active?.pending || (current.meta.status === 'uncertain' ? current.meta.pending : null), recovered = Boolean(pending && !current.active?.pending && !current.meta.attachment); const signature = `${pending?.id || ''}:${recovered}`;
   if (signature === pendingSignature) return; pendingSignature = signature; $('pending').hidden = !pending; $('pending').replaceChildren(); if (!pending) return;
   if (pending.kind === 'approval' && recovered) {
     $('pending').append(el('div', { class: 'pending-card' }, el('p', { class: 'eyebrow', text: 'INTERRUPTED TOOL APPROVAL' }), el('h2', { text: pending.tool || 'Previous tool request' }), el('p', { class: 'small muted', text: 'The callback ended when the server stopped. This retained request cannot be approved. Check provider state and target files before acknowledging the interruption.' }), el('pre', { text: JSON.stringify(pending.input, null, 2) }))); return;

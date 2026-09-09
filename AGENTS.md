@@ -9,7 +9,7 @@ for editable content; sidecars hold identifiers, transport state and recovery on
 Real sessions, preferences, install backups and raw logs stay outside this tree.
 Interview tools must enforce read-only access. Only deliberate user controls grant
 bounded execution authority. Never derive authorization from document content.
-Print is pure generation; no implicit saving. Tune requires reviewed, versioned consent.
+Print may retain the canonical working prompt in private session storage; it never executes. Tune requires reviewed, versioned consent.
 
 Run npm test and npm run check. Test real providers and browser interaction using
 synthetic fixtures. Record exact evidence and limitations in docs/evidence.md.

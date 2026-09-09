@@ -108,6 +108,7 @@ export class Store {
   }
   list() { return fs.readdirSync(path.join(this.root, 'sessions')).filter(f => f.endsWith('.json')).map(f => this.meta(f.slice(0, -5))).sort((a, b) => b.created.localeCompare(a.created)); }
   recover() {
+    for (const m of this.list()) if (m.attachment && !['built', 'returned', 'finished'].includes(m.attachment.state)) { m.attachment.state = 'disconnected'; m.status = 'disconnected'; for (const e of m.attachment.events || []) if (e.kind === 'build' && !e.ack) e.revoked = true; delete m.promptRequest; this.setMeta(m.id, m); }
     for (const m of this.list()) if (['running', 'question', 'approval'].includes(m.status)) { m.status = 'uncertain'; m.mode = 'interview'; m.error = 'The server stopped during a provider request. No request was replayed. Inspect recovery and provider state before continuing.'; this.setMeta(m.id, m); }
   }
   recovery(id, text, label = 'response') { this.meta(id); const file = path.join(this.root, 'recovery', `${id}-${label}-${randomUUID()}.md`); atomic(file, text); return file; }

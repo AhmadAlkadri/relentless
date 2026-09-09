@@ -1,6 +1,6 @@
 ---
 name: sprint-prompt
-description: Package work as a comprehensive next-sprint brief in thin verified slices for a fresh agent session without implementing it, then print the one-sentence kickoff. Invoke for saved handoffs, including after investigation. Relentless Print is an unsaved generation operation and does not invoke this file-writing workflow implicitly.
+description: Package work as a comprehensive next-sprint brief in thin verified slices for a fresh agent session without implementing it, then print the one-sentence kickoff. Invoke for saved handoffs, including after investigation. Relentless Print retains its one working prompt in private session storage and does not invoke this project-file workflow implicitly.
 disable-model-invocation: true
 ---
 
