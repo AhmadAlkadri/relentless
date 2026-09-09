@@ -582,3 +582,22 @@ helper data, controlled no user browser, and did not restart services or alter t
 installed native clients. The root must review and arrange any idle shared-service
 reload and browser refresh separately; no reinstall of native MCP configuration or
 automatic authority recovery is part of this change.
+
+Root acceptance of `6b12aeb`: independently reviewed the renderer, composer,
+integration, static routes and unchanged authorization paths; inspected expanded
+Split, single-pane Preview and 390 px stacked screenshots. A fresh independent
+`node scripts/compose-browser.mjs` run passed **12/12**, exit 0, with report
+`relentless-compose-browser-xz6cLs/report.json`; `npm run check` also passed.
+The root then verified that the installed UI service had no active provider or
+running/terminal helper, restarted only that service, and verified HTTP 200 for
+both new modules, local KaTeX JS/CSS and a shipped font. Its loopback origin stayed
+unchanged and all six existing session/helper Markdown files remained byte-identical.
+The returned project session remained returned; its helper draft remained a draft.
+The private coordination attachment was deliberately reopened on its same ID;
+no project interview or Build was resumed. No native client reinstall was needed.
+
+The normal browser-open call was issued for the returned project notes. Direct
+Safari inspection remained unavailable: both the existing app handle and a fresh
+app selection returned `cgWindowNotFound`. Thus live service activation and
+synthetic Chromium rendering are verified; visibility in the user's Safari window
+is not claimed. No user drafts were edited or submitted during live activation.
