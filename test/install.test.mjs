@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import { install, hashTree } from '../scripts/install.mjs';
+import { install as installAll, hashTree } from '../scripts/install.mjs';
 
+const install = opts => installAll({ ...opts, bridge: false });
 async function fixture(t) {
   const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'relentless installer ')));
   t.after(() => fs.rm(root, { recursive: true, force: true }));

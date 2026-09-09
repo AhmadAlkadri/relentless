@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
+import { installBridge } from './install-bridge.mjs';
 import { fileURLToPath } from 'node:url';
 
 const SKILLS = ['relentless', 'tune', 'sprint-prompt'];
@@ -111,7 +112,7 @@ function sameBackup(left, right) {
  */
 export async function install({
   repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'),
-  home = os.homedir(), dryRun = false, uninstall = false, adopt = {}, diagnostics = false
+  home = os.homedir(), dryRun = false, uninstall = false, adopt = {}, diagnostics = false, bridge = true
 } = {}) {
   if (!adopt || typeof adopt !== 'object' || Array.isArray(adopt)) throw new Error('Adoption approvals must be a destination-to-hash object.');
   repo = path.resolve(repo);
@@ -256,7 +257,9 @@ export async function install({
       results.push({ path: destination, action: identical ? 'deduplicate' : alreadyDirect ? 'track' : 'install', source: resolvedSource,
         hash: sourceState.hash, previous: current.kind, backup, dryRun });
     }
-    return { ok: !results.some(result => result.action === 'conflict'), dryRun, manifest: manifestFile, results };
+    const linksOK = !results.some(result => result.action === 'conflict');
+    const bridgeResult = bridge && linksOK ? await installBridge({ repo, home, dryRun, diagnostics, uninstall }) : null;
+    return { ok: linksOK && (!bridgeResult || bridgeResult.ok), dryRun, manifest: manifestFile, results, bridge: bridgeResult };
   } finally {
     if (lock) await fs.rmdir(lock);
   }
