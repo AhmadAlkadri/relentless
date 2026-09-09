@@ -493,3 +493,92 @@ HTTP interval to expire before resuming. The earlier HTTP AbortSignal fixture
 certifies cancellation at that transport layer, not cancellation propagation by
 every hosting wrapper. Prefer the normal pending-result boundary for maintenance;
 do not treat an outer task termination as proof that the MCP request ended.
+
+## 2026-09-09: formatted answer composition and local equations
+
+The user requested readable Markdown and equations while composing, with more
+horizontal room. A synthetic pre-fix browser fixture reproduced the limitation:
+at a 1600 px viewport the writing column measured exactly 760 px, neither the
+main draft nor the structured question answer had a formatted view, and no
+Split or Expand controls existed. `node scripts/compose-browser.mjs --baseline`
+passed those baseline assertions before the runtime edits, exit 0; retained report
+`relentless-compose-browser-WbMwF5/report.json` and screenshot
+`screenshots/baseline-no-preview-760px.png`. The root separately reproduced Marked
+consuming TeX backslashes, norm delimiters and matrix row separators.
+
+Write / Split / Preview now wrap the existing main, structured-answer and returned
+helper-draft textareas. Preview is read only, Write returns to the source and its
+caret/scroll position, and Expand uses the available workspace width. Narrow panes
+stack Split; long math and tables remain contained. The pre-existing unbroken
+project path overflow was reproduced at 390 px during regression and fixed with
+wrapping. These display preferences use browser storage only. Textareas and their
+existing recovery, explicit save, helper-insertion and submission paths remain
+the source of truth. The shared renderer also formats submitted conversation math.
+
+KaTeX 0.18.7 is pinned with its locally served module, stylesheet and shipped font
+allowlist. Its dependency engine requires Node 22.12+, now stated in package
+metadata and README. Formula tokens are recognized before Markdown consumes TeX;
+random per-render text placeholders pass through the unchanged DOMPurify Markdown
+allowlist, then are replaced with KaTeX-generated DOM. User HTML cannot opt into
+that richer DOM. Rendering uses fresh macros per formula, `trust: false`,
+`strict: 'error'`, `maxSize: 20`, `maxExpand: 1000`, and a 12,000-character formula
+limit. Unrenderable formulas retain exact source through textContent; raw error
+messages are never inserted as HTML. The existing script/style CSP remains intact.
+These choices follow the [KaTeX options](https://katex.org/docs/options) and
+[security guidance](https://katex.org/docs/security); no general Markdown tag or
+attribute permission was expanded.
+
+Verification performed by the implementation worker:
+
+- `node scripts/compose-browser.mjs`: **12/12 passed**, exit 0. Final report
+  `relentless-compose-browser-Xj4l1r/report.json`, with detailed sanitized-render
+  observations in `render-security.json`. Reports and screenshots are retained
+  under the macOS temporary directory
+  `/private/var/folders/gp/3clyhj4s45x6bqgx6ym6978c0000gn/T/`.
+- Browser assertions cover exact norm/subscript/matrix/integral TeX annotations
+  for all four delimiter styles; ordinary Markdown; escaped delimiters, inline,
+  fenced, indented and raw HTML code; invalid formulas; isolated macros and bounded
+  recursion; oversized source; malicious HTML, spoofed marker/class attributes,
+  JavaScript/relative Markdown links and TeX URL/image/HTML commands; protocol
+  fence hiding; working generated style properties under the unchanged CSP.
+  There were **zero page errors, CSP violations, external requests, failed local
+  assets or native/app-owned provider calls**. One deliberately selected answer
+  helper used only an injected synthetic runner.
+- UI checks cover both primary answer surfaces and a two-question batch, local
+  mode/width switches, caret, textarea scroll, undo, Unicode recovery after reload,
+  actual polling, composition-event deferral, ignored composing Enter shortcuts,
+  delayed session switching with empty previews while loading, isolated session
+  drafts, same-question Markdown revision changes, and empty subsequent questions.
+  Mode/width/render operations made **no POST requests** and left canonical content,
+  prompts and authority unchanged. Only deliberate Send/Continue produced answer
+  payloads; those payloads matched the textarea strings including surrounding
+  whitespace, Unicode and TeX. Legacy server conversation formatting/trimming is
+  unchanged and is not an exact-file-byte claim.
+- Helper draft preview and deliberate insertion retained the unsubmitted boundary.
+  At 820, 390 and 320 px, both Split surfaces stacked without horizontal page
+  overflow, including long display math, tables, and submitted inline math with
+  both line-break opportunities and a single indivisible expression.
+- `node scripts/attached-browser.mjs`: **12/12 passed**, exit 0; report
+  `relentless-attached-browser-5P9qio/report.json`. Existing helper, Print, Build,
+  draft recovery and attachment-control behavior remained green.
+- `node scripts/browser-questions.mjs mock`: passed the structured question,
+  external Markdown draft copy, free-form callback and follow-up, exit 0; fixture
+  `relentless-question-mock-yDwuTW`, screenshot `output/playwright/mock-question.png`.
+- `npm test`: **88/88 passed**, exit 0, including new local module/font route,
+  traversal and unchanged-CSP checks. `npm run check`: JavaScript syntax, canonical
+  skill metadata and whitespace passed, exit 0.
+- The worker visually inspected expanded Split, single-pane Preview and 390 px
+  stacked output, including correctly formed matrices, norms and integrals. Useful
+  final fixture screenshots: `split-expanded.png`, `single-pane-preview.png`,
+  `narrow-stacked-390px.png`, `final-expanded-split.png`.
+
+The final browser report records Node v25.2.1 and the isolated Chromium version.
+Node 22.12 itself was not exercised. Physical IME interaction, screen-reader behavior,
+Safari and live native-provider/helper sessions are not certified by this fixture.
+Synthetic event dispatch verifies composition handling, not every operating-system
+IME. KaTeX supports a TeX subset; malformed, unsupported and oversized formulas stay
+readable as source. The worker used no real session, transcript, preference or
+helper data, controlled no user browser, and did not restart services or alter the
+installed native clients. The root must review and arrange any idle shared-service
+reload and browser refresh separately; no reinstall of native MCP configuration or
+automatic authority recovery is part of this change.

@@ -65,3 +65,20 @@ test('native final message replaces an abandoned streamed Tune draft before Mark
   assert.equal(parseDocument(renderDocument('Fixture', { conversation: text })).conversation, final);
   assert.throws(() => codexCompletedText([]), /without a final message/);
 });
+
+test('local math assets use explicit routes with the existing CSP', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'relentless-math-assets-'));
+  const s = await startServer({ root });
+  try {
+    for (const [route, type] of [['/markdown.js', 'text/javascript'], ['/compose.js', 'text/javascript'], ['/vendor/katex.js', 'text/javascript'], ['/vendor/katex.css', 'text/css'], ['/vendor/fonts/KaTeX_Main-Regular.woff2', 'font/woff2']]) {
+      const response = await fetch(s.origin + route); assert.equal(response.status, 200, route);
+      assert.equal(response.headers.get('content-type'), `${type}; charset=utf-8`);
+      assert.match(response.headers.get('content-security-policy'), /script-src 'self'; style-src 'self';/);
+      assert.ok(!response.headers.get('content-security-policy').includes('unsafe-inline'));
+      if (type === 'font/woff2') assert.equal(Buffer.from(await response.arrayBuffer()).subarray(0, 4).toString(), 'wOF2');
+      else assert.ok((await response.text()).length > 100);
+    }
+    const headers = { Authorization: `Bearer ${s.token}` };
+    for (const route of ['/vendor/fonts/package.json', '/vendor/fonts/KaTeX_unknown.woff2', '/vendor/fonts/%2e%2e%2fpackage.json', '/vendor/katex/package.json']) assert.equal((await fetch(s.origin + route, { headers })).status, 404, route);
+  } finally { await s.close(); }
+});

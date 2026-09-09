@@ -18,9 +18,14 @@ export async function startServer({ root = dataHome(), port = 0, bridgeWaitMs = 
   const app = new Workspace(store);
   let origin;
   const staticFiles = {
-    '/': ['public/index.html', 'text/html'], '/app.js': ['public/app.js', 'text/javascript'], '/style.css': ['public/style.css', 'text/css'],
+    '/': ['public/index.html', 'text/html'], '/markdown.js': ['public/markdown.js', 'text/javascript'], '/compose.js': ['public/compose.js', 'text/javascript'], '/app.js': ['public/app.js', 'text/javascript'], '/style.css': ['public/style.css', 'text/css'],
+    '/vendor/katex.js': ['node_modules/katex/dist/katex.mjs', 'text/javascript'], '/vendor/katex.css': ['node_modules/katex/dist/katex.min.css', 'text/css'],
     '/vendor/marked.js': ['node_modules/marked/lib/marked.esm.js', 'text/javascript'], '/vendor/purify.js': ['node_modules/dompurify/dist/purify.es.mjs', 'text/javascript']
   };
+  // Serve only shipped KaTeX font names; no request path is joined to disk.
+  for (const font of fs.readdirSync(path.join(repo, 'node_modules/katex/dist/fonts'))) {
+    if (/^KaTeX_[A-Za-z0-9-]+\.(?:woff2?|ttf)$/.test(font)) staticFiles[`/vendor/fonts/${font}`] = [`node_modules/katex/dist/fonts/${font}`, font.endsWith('.woff2') ? 'font/woff2' : font.endsWith('.woff') ? 'font/woff' : 'font/ttf'];
+  }
   const server = http.createServer(async (req, res) => {
     res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'");
     res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('Referrer-Policy', 'no-referrer'); res.setHeader('Cache-Control', 'no-store');

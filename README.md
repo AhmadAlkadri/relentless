@@ -24,6 +24,19 @@ brief, decisions, facts, assumptions and questions; explicit answers in the
 conversation also inform synthesis without copying them into those fields.
 Agent recommendations remain proposals until accepted.
 
+Use **Write**, **Split**, or **Preview** while composing an answer. Split shows
+editable Markdown beside formatted text and equations; Preview is read only.
+**Expand** uses the available workspace width, and Split stacks on narrow panes.
+These browser display choices never save or send an answer. The original Markdown
+remains the exact editor and submission source, including Unicode and TeX.
+
+Equations support `$...$`, `$$...$$`, `\(...\)`, and `\[...\]`. Inline math
+uses one source line; display math may span lines. Dollar inline delimiters must touch
+the formula; escape literal dollars as `\$`. Markdown code spans and fenced or
+indented code blocks stay literal. Invalid or oversized formulas retain readable
+source. KaTeX and its fonts are pinned and served locally; TeX cannot add links,
+remote images or arbitrary HTML. Preview uses the same renderer as conversation.
+
 **Print** displays the one working execution prompt. If it does not exist or public
 context changed, Print asks the interviewer to synthesize it. The result is retained
 in private session storage. Repeated Print reuses the same body. The prompt records
@@ -127,7 +140,7 @@ project-file handoff workflow. Relentless Print does not invoke it implicitly.
 
 ## Install, update and rollback
 
-Requires Node 22+, WezTerm for terminal tab/focus controls, and installed authenticated
+Requires Node 22.12+, WezTerm for terminal tab/focus controls, and installed authenticated
 native clients. From this existing checkout:
 
 ```sh
@@ -166,6 +179,7 @@ node scripts/attached-live.mjs codex 135
 node scripts/attached-live.mjs claude 135
 node scripts/attached-live.mjs claude 150 --background
 node scripts/attached-browser.mjs
+node scripts/compose-browser.mjs
 node scripts/attached-live.mjs codex 0 --build
 node scripts/attached-live.mjs claude 0 --build
 node scripts/helpers-live.mjs codex

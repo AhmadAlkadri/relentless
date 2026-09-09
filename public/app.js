@@ -1,5 +1,5 @@
-import { marked } from '/vendor/marked.js';
-import DOMPurify from '/vendor/purify.js';
+import { cleanMarkdown } from '/markdown.js';
+import { compose, updateComposition, writeComposition, clearCompositions } from '/compose.js';
 
 const $ = id => document.getElementById(id);
 const fragment = new URLSearchParams(location.hash.slice(1));
@@ -49,17 +49,6 @@ async function api(route, body) {
   return data;
 }
 function sessionApi(operation = '', body) { if (!selected) throw new Error('Choose a session first.'); return api(`sessions/${selected}${operation ? `/${operation}` : ''}`, body); }
-function cleanMarkdown(text) {
-  const publicText = String(text || '').replace(/```relentless-(?:state|tune|accepted|question)\s*\n[\s\S]*?\n```/g, '').replace(/```relentless-(?:state|tune|accepted|question)[\s\S]*$/, '');
-  const html = DOMPurify.sanitize(marked.parse(publicText, { breaks: false }), { ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'del', 'a', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'pre', 'code', 'hr', 'table', 'thead', 'tbody', 'tr', 'th', 'td'], ALLOWED_ATTR: ['href', 'title', 'start'], ALLOW_DATA_ATTR: false });
-  const template = document.createElement('template'); template.innerHTML = html;
-  for (const a of template.content.querySelectorAll('a')) {
-    const href = a.getAttribute('href') || '';
-    if (!/^(https?:|mailto:|#)/i.test(href)) a.removeAttribute('href');
-    a.target = '_blank'; a.rel = 'noopener noreferrer';
-  }
-  return template.content;
-}
 function selectionInside(node) { const selection = getSelection(); return selection && !selection.isCollapsed && (node.contains(selection.anchorNode) || node.contains(selection.focusNode)); }
 function renderMarkdown(node, text) { if (selectionInside(node)) return false; node.replaceChildren(cleanMarkdown(text)); return true; }
 function applyDisplay() {
@@ -152,7 +141,7 @@ function renderNavigation(force = false) {
 }
 async function refreshState() { state = await api('state'); renderNavigation(); $('connection').textContent = state.active ? 'One agent turn active' : 'Connected locally'; $('connection').previousElementSibling.classList.remove('offline'); }
 async function selectSession(id) {
-  selected = id; current = null; conversationSignature = streamSignature = pendingSignature = tuneSignature = suggestionsSignature = '';
+  selected = id; current = null; clearCompositions(); renderSession(); conversationSignature = streamSignature = pendingSignature = tuneSignature = suggestionsSignature = '';
   localStorage.setItem('relentless-last-session', id); const hash = new URLSearchParams(location.hash.slice(1)); hash.set('session', id); hash.delete('tune'); history.replaceState(null, '', `${location.pathname}#${hash}`);
   document.body.classList.remove('nav-open'); $('nav-button').setAttribute('aria-expanded', 'false'); $('use-preferences').checked = false;
   await refreshSession(); renderNavigation(true);
@@ -184,6 +173,7 @@ function syncEditors() {
     else if (b.base !== incoming) b.conflict = true;
     else { b.revision = current.revision; b.conflict = false; }
     if (node.value !== b.text) { const start = node.selectionStart, end = node.selectionEnd, scroll = node.scrollTop; node.value = b.text; if (document.activeElement === node) { node.setSelectionRange(Math.min(start, b.text.length), Math.min(end, b.text.length)); node.scrollTop = scroll; } }
+    updateComposition(node);
     renderEditorStatus(section);
     const preview = $(`preview-${section}`); if (preview) preview.textContent = incoming || (section === 'scratchpad' ? 'A private place for unfinished thoughts.' : 'Nothing recorded yet.');
   }
@@ -201,6 +191,7 @@ function updateSaveSummary() {
   const edited = [...buffers].filter(([k, v]) => k.startsWith(`${selected}:`) && v.dirty); $('workspace-state').textContent = edited.length ? `${edited.length} unsaved ${edited.length === 1 ? 'section' : 'sections'} · held in this browser` : 'All edits saved locally';
   $('build-unsaved').textContent = edited.some(([k]) => !k.endsWith(':draft') && !k.endsWith(':scratchpad')) ? 'There are unsaved context edits. Build uses only the saved scope shown above.' : '';
 }
+compose($('editor-draft'));
 for (const node of document.querySelectorAll('textarea[data-section]')) node.addEventListener('input', () => { if (!current) return; const section = node.dataset.section, b = editor(section); b.text = node.value; b.dirty = b.text !== b.base; if (!b.dirty) b.conflict = false; rememberBuffer(section, b); renderEditorStatus(section); });
 for (const node of document.querySelectorAll('[data-save]')) if (node.id === 'save-draft-button' || node.dataset.save === 'raw') node.addEventListener('click', () => run(() => saveSection(node.dataset.save)));
 async function saveSection(section) {
@@ -223,7 +214,7 @@ function compareSection(section) {
 
 function renderSession() {
   $('welcome').hidden = Boolean(current); $('session-view').hidden = !current; $('context-button').disabled = !current;
-  if (!current) { $('mode-badge').textContent = 'Local workspace'; $('session-title').textContent = ''; return; }
+  if (!current) { clearCompositions(); $('mode-badge').textContent = 'Local workspace'; $('session-title').textContent = ''; return; }
   const m = current.meta, attached = m.attachment, ended = attached && ['built', 'returned', 'finished', 'disconnected', 'paused'].includes(attached.state), finishing = attached?.state === 'finishing', active = Boolean(current.active), invalid = !current.values, interrupted = m.status === 'uncertain';
   document.title = `${m.title} · Relentless`; $('session-title').textContent = m.title; $('session-target').textContent = m.project || 'An idea with room to develop. No project directory selected.';
   $('mode-badge').textContent = `${m.backend === 'mock' ? 'Synthetic' : m.backend === 'codex' ? 'Codex' : 'Claude'} · ${m.mode === 'build' ? 'Execution' : 'Read-only interview'}`; $('mode-badge').classList.toggle('executing', m.mode === 'build');
@@ -311,11 +302,11 @@ function renderPending() {
   const answers = {};
   const fields = (pending.questions || []).map((question, i) => {
     const key = question.id || question.question || String(i), area = el('textarea', { rows: 3, 'aria-label': `Answer: ${question.question}`, placeholder: 'Your own answer, a question back, or help me think through this.' }); answers[key] = area;
-    const options = (question.options || []).map(option => button(option.label || option, () => { area.value = option.label || option; area.dispatchEvent(new Event('input')); area.focus(); }, { title: option.description || '' }));
-    options.push(button('Help me think through this', () => { area.value = 'Help me think through this.'; area.dispatchEvent(new Event('input')); area.focus(); }));
+    const options = (question.options || []).map(option => button(option.label || option, () => { area.value = option.label || option; area.dispatchEvent(new Event('input')); writeComposition(area); area.focus(); }, { title: option.description || '' }));
+    options.push(button('Help me think through this', () => { area.value = 'Help me think through this.'; area.dispatchEvent(new Event('input')); writeComposition(area); area.focus(); }));
     const bufferKey = `relentless-question:${selected}:${pending.id}:${key}`; area.value = readLocal(bufferKey, ''); area.addEventListener('input', () => writeLocal(bufferKey, area.value));
-    const fromDraft = button('Use saved Markdown draft', () => { if (area.value.trim()) throw new Error('Clear this question answer first to preserve your current writing.'); area.value = current.values?.draft || ''; area.dispatchEvent(new Event('input')); area.focus(); notice('Saved draft copied. Review it, then send the answer explicitly.'); });
-    return el('fieldset', {}, el('legend', { text: question.question || question.header || 'A question for you' }), el('div', { class: 'pending-options' }, ...options), area, fromDraft);
+    const fromDraft = button('Use saved Markdown draft', () => { if (area.value.trim()) throw new Error('Clear this question answer first to preserve your current writing.'); area.value = current.values?.draft || ''; area.dispatchEvent(new Event('input')); writeComposition(area); area.focus(); notice('Saved draft copied. Review it, then send the answer explicitly.'); });
+    return el('fieldset', {}, el('legend', { text: question.question || question.header || 'A question for you' }), el('div', { class: 'pending-options' }, ...options), compose(area, 'question'), fromDraft);
   });
   const submit = button('Send answer', async () => {
     const values = Object.fromEntries(Object.entries(answers).map(([key, area]) => [key, area.value])); if (!Object.values(values).some(x => x.trim())) throw new Error('Write anything that helps, including a question back.');
@@ -363,6 +354,7 @@ function renderTune() {
   }
 }
 document.addEventListener('keydown', event => {
+  if (event.isComposing) return;
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') { const section = document.activeElement?.dataset?.section; if (section) { event.preventDefault(); run(() => saveSection(section)); } }
   if ((event.metaKey || event.ctrlKey) && event.key === 'Enter' && document.activeElement === $('editor-draft') && !$('continue-button').disabled) { event.preventDefault(); run(() => startTurn('continue')); }
   if (event.key === 'Escape' && !$('modal').open) { toggleContext(false); document.body.classList.remove('nav-open'); }
@@ -392,7 +384,7 @@ function insertHelperDraft(text, helper) {
   if (helper.stale) throw new Error('This suggestion belongs to an older question or context. Copy useful text deliberately; your current answer is preserved.');
   const fields = [...$('pending').querySelectorAll('textarea')], field = fields.length === 1 ? fields[0] : $('editor-draft');
   const sessionAtReview = selected, questionAtReview = current.helperQuestion.id;
-  const apply = value => { if (selected !== sessionAtReview || current.contextRevision !== helper.contextRevision || current.helperQuestion.id !== questionAtReview || !field.isConnected || current.helpers.find(h => h.id === helper.id)?.stale) throw new Error('The question or context changed during review. Your writing and suggestion remain preserved; review the current question first.'); field.value = value; field.dispatchEvent(new Event('input', { bubbles: true })); field.focus(); closeModal(); notice('Draft inserted for your review. It has not been sent.'); };
+  const apply = value => { if (selected !== sessionAtReview || current.contextRevision !== helper.contextRevision || current.helperQuestion.id !== questionAtReview || !field.isConnected || current.helpers.find(h => h.id === helper.id)?.stale) throw new Error('The question or context changed during review. Your writing and suggestion remain preserved; review the current question first.'); field.value = value; field.dispatchEvent(new Event('input', { bubbles: true })); writeComposition(field); field.focus(); closeModal(); notice('Draft inserted for your review. It has not been sent.'); };
   if (!field.value.trim()) { apply(text); return; }
   const mine = el('textarea', { value: field.value, 'aria-label': 'Your current answer', readOnly: true });
   const proposal = el('textarea', { value: text, 'aria-label': 'Suggested answer to insert' });
@@ -409,7 +401,7 @@ function renderHelpers() {
     return el('details', { class: 'helper-card', open: true }, el('summary', { text: `${h.draft ? 'Drafted by' : 'Drafting with'} ${label} · Not sent${h.stale ? ' · Older suggestion' : ''}` }),
       h.error ? el('p', { class: 'callout', text: h.error }) : null,
       ['running', 'terminal'].includes(h.status) ? el('p', { class: 'small muted', text: h.status === 'terminal' ? 'Private discussion is owned by its WezTerm tab. Exit that helper to return a draft here.' : 'The helper is thinking. Your writing remains available.' }) : null,
-      h.draft ? area : null, h.draft ? el('div', { class: 'button-row' }, button('Use this draft', () => insertHelperDraft(area.value, h), { disabled: h.stale }), button('Copy suggestion', () => copy(area.value)), button('Discuss this draft', () => discussHelper(h, area.value)), button('Discuss in WezTerm', async () => { const result = await sessionApi('helper-discuss', { helperId: h.id, includeDraft: true, draft: area.value }); notice(`Opened this exact helper session in pane ${result.pane} with your reviewed draft. Exit the helper when ready to return a draft.`); await refreshSession(); }, { disabled: active })) : null);
+      h.draft ? compose(area, 'helper') : null, h.draft ? el('div', { class: 'button-row' }, button('Use this draft', () => insertHelperDraft(area.value, h), { disabled: h.stale }), button('Copy suggestion', () => copy(area.value)), button('Discuss this draft', () => discussHelper(h, area.value)), button('Discuss in WezTerm', async () => { const result = await sessionApi('helper-discuss', { helperId: h.id, includeDraft: true, draft: area.value }); notice(`Opened this exact helper session in pane ${result.pane} with your reviewed draft. Exit the helper when ready to return a draft.`); await refreshSession(); }, { disabled: active })) : null);
   }));
 }
 function discussHelper(helper, displayedDraft) {

@@ -12,3 +12,28 @@
 .helper-card .markdown { max-height: 24rem; overflow: auto; }
 
 .prompt-candidates pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* Composition remains inside the workspace; long equations scroll in their pane. */
+body.compose-expanded .writing-column{max-width:none}
+body.compose-expanded .session-heading,body.compose-expanded .control-bar{max-width:none}
+.compose-view{min-width:0;container-type:inline-size}
+.compose-toolbar{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin:0 0 12px}
+.compose-toolbar button{font-size:11px;padding:5px 9px}
+.compose-toolbar button[aria-pressed=true]{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+.compose-toolbar .compose-expand{margin-left:auto}
+.compose-panes{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;min-width:0}
+.compose-panes>textarea,.compose-preview{min-width:0;margin:0}
+.compose-view[data-mode=split] .compose-panes{grid-template-columns:repeat(2,minmax(0,1fr))}
+.compose-preview{min-height:140px;padding:0 4px;overflow:auto;max-height:65vh}
+.compose-view[data-mode=split] .compose-preview{border-left:1px solid var(--line);padding-left:18px}
+.compose-preview>:last-child{margin-bottom:0}
+.compose-preview:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.compose-view[data-mode=split] #editor-draft{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:14px}
+.markdown .katex{font-size:1.05em}
+.markdown .katex-display{overflow-x:auto;overflow-y:hidden;max-width:100%;padding:4px 0}
+.markdown .math-source{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.8em;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--muted)}
+.pending-card fieldset{min-width:0}
+@container(max-width:600px){.compose-view[data-mode=split] .compose-panes{grid-template-columns:minmax(0,1fr)}.compose-view[data-mode=split] .compose-preview{border-left:0;border-top:1px solid var(--line);padding:16px 4px 0}}
+
+#session-target{overflow-wrap:anywhere}
+.markdown .math-inline{display:inline-block;max-width:100%;overflow-x:auto;overflow-y:hidden;vertical-align:middle}

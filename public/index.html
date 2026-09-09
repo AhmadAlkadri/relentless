@@ -6,6 +6,7 @@
   <meta name="color-scheme" content="light dark">
   <link rel="icon" href="data:,">
   <title>Relentless · A place to think</title>
+  <link rel="stylesheet" href="/vendor/katex.css">
   <link rel="stylesheet" href="/style.css">
   <script type="module" src="/app.js"></script>
 </head>
@@ -77,7 +78,7 @@
                 <div class="editor-heading"><label for="editor-draft">Your space to answer</label><span id="save-draft" class="save-status">Saved locally</span></div>
                 <textarea id="editor-draft" data-section="draft" rows="6" placeholder="Follow the thought. A rough answer, a question back, or “help me think through this” all belong here."></textarea>
                 <div id="conflict-draft" class="conflict" hidden></div>
-                <div class="composer-footer"><span class="small muted">Markdown welcome · ⌘ Enter to continue</span><div class="button-row"><button id="save-draft-button" data-save="draft">Save draft</button><button id="continue-button" class="primary">Continue <span aria-hidden="true">↗</span></button></div></div>
+                <div class="composer-footer"><span class="small muted">Markdown + math · ⌘ Enter to continue</span><div class="button-row"><button id="save-draft-button" data-save="draft">Save draft</button><button id="continue-button" class="primary">Continue <span aria-hidden="true">↗</span></button></div></div>
                 <label class="checkbox-line"><input id="use-preferences" type="checkbox"> Include my saved collaboration preferences in this turn</label>
                 <p class="small muted">Continue sends this answer with saved public context. It does not save unsent context edits or authorize implementation.</p>
               </section>
