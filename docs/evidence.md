@@ -400,3 +400,21 @@ request and retain their owner, so no native conversation restart or reinstall i
 needed. An already loaded MCP tool description may remain old until the client's
 next ordinary restart; its parameter schema is compatible and the canonical skill
 is read from the updated source.
+
+Root integration verified `c26c4b2` in the original native conversation. The root
+independently inspected the routing/authority diff and reran the attachment suite:
+**15/15 passed**, exit 0. Read-only live metadata showed no active provider or
+helper, so only the shared UI service was restarted. The native MCP connection
+and its owner remained in use; an unrelated paused session remained paused.
+Through the installed native tools, the root selected project A, resumed the
+private portfolio coordination session, and resumed A. The returned canonical
+targets were correct; A retained the same session, attachment and context revision,
+and its public context excluded the portfolio ledger. Both sessions had no prompt.
+The root published the first substantive project question and inspected Safari's
+accessibility tree and rendered question/answer area. The browser displayed the
+correct project path and original-conversation ownership explanation. Duplicate
+tabs created by the switching check were closed, leaving one active sidecar tab.
+No native client reinstall/restart, project Build, helper, or implementation worker
+launch was part of this live check. The real answer/Build round trip and concurrent
+execution remain to be dogfooded; the synthetic authority tests are not a claim
+that those portfolio operations have already completed.
