@@ -22,7 +22,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
     if (!state.bridgeToken) throw new Error('The old Relentless server is still running. Stop and restart it once before attachment. No standalone fallback was started.');
     const name = request.params.name, input = request.params.arguments || {};
     if (!tools.some(t => t.name === name)) throw new Error('Unknown interaction tool.');
-    const result = await api(state, `bridge/${name}`, { owner, client, pane: process.env.WEZTERM_PANE || null, socket: process.env.WEZTERM_UNIX_SOCKET || null, ...input }, { bridge: true, signal: extra.signal });
+    const definition = tools.find(t => t.name === name);
+    if (Object.keys(input).some(key => !(key in definition.inputSchema.properties))) throw new Error('Unknown argument. Transport identity cannot be supplied by model content.');
+    const result = await api(state, `bridge/${name}`, { ...input, owner, client, pane: process.env.WEZTERM_PANE || null, socket: process.env.WEZTERM_UNIX_SOCKET || null }, { bridge: true, signal: extra.signal });
     if (name === 'open_interview') openBrowser(state, result.session);
     return { content: [{ type: 'text', text: JSON.stringify(result) }], structuredContent: result };
   } catch (error) { return { isError: true, content: [{ type: 'text', text: error.message }] }; }

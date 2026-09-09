@@ -1,6 +1,6 @@
 {
   "name": "relentless-workspace",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "A local Markdown space for thinking with agents",

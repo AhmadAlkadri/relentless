@@ -12,10 +12,10 @@ export class Prompts {
   view(id) {
     const s = this.store.read(id), meta = s.meta.prompt;
     if (!meta) return null;
-    const candidates = (meta.candidates || []).map(c => ({ ...c, text: fs.readFileSync(this.store.file(id, `candidate-${c.id}.md`), 'utf8') }));
+    const candidates = (meta.candidates || []).map(c => { try { return { ...c, text: fs.readFileSync(this.store.file(id, `candidate-${c.id}.md`), 'utf8') }; } catch (e) { if (e.code !== 'ENOENT') throw e; return { ...c, text: '', missing: true }; } });
     if (!fs.existsSync(this.file(id))) return { text: '', revision: null, path: this.file(id), current: false, ready: false, candidates };
     const text = fs.readFileSync(this.file(id), 'utf8'), revision = hash(text), edited = revision !== meta.revision;
-    const current = meta.sourceRevision === contextRevision(s);
+    const current = Boolean(s.values && meta.sourceRevision === contextRevision(s));
     return { ...meta, text, revision, path: this.file(id), manual: meta.manual || edited, current, ready: Boolean(current && !edited && meta.ready && !meta.blockers?.length), candidates };
   }
   archive(id, text) {
@@ -31,14 +31,17 @@ export class Prompts {
     if (candidate) {
       const candidateId = randomUUID(); atomic(this.store.file(id, `candidate-${candidateId}.md`), text);
       s.meta.prompt ||= { candidates: [] }; s.meta.prompt.candidates ||= []; s.meta.prompt.candidates.push({ ...meta, id: candidateId });
+      delete s.meta.promptRequest;
       this.store.setMeta(id, s.meta); return { candidate: true, id: candidateId, reason: sourceRevision !== contextRevision(s) ? 'Context changed during synthesis.' : 'Your current or manually edited prompt is preserved.' };
     }
     if (old) this.archive(id, old.text);
     atomic(this.file(id), text); s.meta.prompt = { ...meta, candidates: old?.candidates?.map(({ text, ...c }) => c) || [] };
     delete s.meta.promptRequest; this.store.setMeta(id, s.meta); return { candidate: false, revision };
   }
-  advanceOwnPublication(id, before, after) {
-    const s = this.store.read(id); if (s.meta.prompt?.sourceRevision === before && s.meta.prompt?.revision && !this.view(id)?.manual) { s.meta.prompt.sourceRevision = after; this.store.setMeta(id, s.meta); }
+  advanceOwnPublication(id, before, after, candidateId) {
+    const s = this.store.read(id);
+    if (candidateId) { const candidate = s.meta.prompt?.candidates?.find(c => c.id === candidateId); if (candidate?.sourceRevision === before) { candidate.sourceRevision = after; this.store.setMeta(id, s.meta); } return; }
+    if (s.meta.prompt?.sourceRevision === before && s.meta.prompt?.revision && !this.view(id)?.manual) { s.meta.prompt.sourceRevision = after; this.store.setMeta(id, s.meta); }
   }
   edit(id, { text, revision, sourceRevision, ready = false, candidateId }) {
     const s = this.store.read(id), old = this.view(id);

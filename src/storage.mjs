@@ -96,10 +96,12 @@ export class Store {
     const s = this.read(id); if (!s.values) throw new Fault(s.error, 422);
     return this.update(id, 'conversation', `${s.values.conversation}\n\n### ${role}\n\n${text}`.trim(), s.revision);
   }
-  create({ title = 'Untitled idea', project = null, backend = 'codex', context = '' } = {}) {
+  create({ title = 'Untitled idea', project = null, backend = 'codex', context = '' } = {}, { nativeAttachment = false } = {}) {
     if (!['codex', 'claude', 'mock'].includes(backend)) throw new Fault('Unknown backend.');
     if (typeof title !== 'string' || title.length > 250) throw new Fault('Use a title under 250 characters.');
-    project = projectPath(project, [this.root, this.repo].filter(Boolean));
+    // Native interviewing may target this source checkout without granting any
+    // app-owned provider access to it. The browser cannot set this second argument.
+    project = projectPath(project, [this.root, nativeAttachment ? null : this.repo].filter(Boolean));
     const id = randomUUID();
     const stat = project ? fs.statSync(project) : null;
     this.setMeta(id, { id, title, project, projectIdentity: stat ? { device: stat.dev, inode: stat.ino } : null, backend, created: new Date().toISOString(), status: 'idle', mode: 'interview', providers: {}, requests: [], protocol: null });

@@ -63,13 +63,16 @@ export async function startServer({ root = dataHome(), port = 0 } = {}) {
       }
       if (req.method !== 'POST') throw new Fault('Unsupported method.', 405);
       let result;
-      if (operation === 'save') { result = body.section ? store.update(id, body.section, body.text, body.revision) : store.save(id, body.raw, body.revision); if (app.active?.id === id && app.active.mode === 'build' && scopeHash(result.values, result.meta.project) !== app.active.scope) app.pause(id); }
+      if (operation === 'save') { result = body.section ? store.update(id, body.section, body.text, body.revision) : store.save(id, body.raw, body.revision); if (app.buildChanged(result)) app.pause(id); }
       else if (operation === 'turn') result = await app.begin(id, body);
       else if (operation === 'answer') result = app.answer(id, body);
       else if (operation === 'pause') result = app.pause(id);
       else if (operation === 'print') result = await app.print(id, body.revision);
       else if (operation === 'prompt-edit') result = app.prompts.edit(id, body);
       else if (operation === 'return') result = app.attachments.user(id, { action: 'return', requestId: body.requestId });
+      else if (operation === 'helper-start') result = await app.helpers.start(id, body);
+      else if (operation === 'helper-cancel') result = app.helpers.cancel(id);
+      else if (operation === 'helper-discuss') result = await app.helpers.discuss(id, body);
       else if (operation === 'export') result = app.export(id);
       else if (operation === 'acknowledge') result = app.acknowledge(id);
       else if (operation === 'reconcile') result = await app.reconcile(id);
@@ -88,8 +91,8 @@ export async function startServer({ root = dataHome(), port = 0 } = {}) {
   const stateFile = path.join(store.root, 'server.json'); atomic(stateFile, JSON.stringify({ pid: process.pid, origin, token, bridgeToken, root: store.root }));
   // Poll the actual Markdown inode, including replace/rename saves, to revoke a
   // running Build if its agreed scope is edited outside the browser.
-  const watcher = setInterval(() => { if (app.active?.mode === 'build') { try { const s = store.read(app.active.id); checkProject(s.meta); if (!s.values || scopeHash(s.values, s.meta.project) !== app.active.scope) app.pause(s.id); } catch { app.pause(app.active.id); } } }, 500);
+  const watcher = setInterval(() => { if (app.active?.mode === 'build') { try { const s = store.read(app.active.id); checkProject(s.meta); if (app.buildChanged(s)) app.pause(s.id); } catch { app.pause(app.active.id); } } }, 500);
   let closed = false;
-  async function close() { if (closed) return; closed = true; clearInterval(watcher); if (app.active) { app.pause(app.active.id); await Promise.race([app.active.done, new Promise(r => setTimeout(r, 5000))]); } server.closeAllConnections(); await new Promise(r => server.close(r)); if (Number(fs.readFileSync(lock, 'utf8')) === process.pid) fs.unlinkSync(lock); if (fs.existsSync(stateFile)) fs.unlinkSync(stateFile); }
+  async function close() { if (closed) return; closed = true; clearInterval(watcher); const helperTasks = [...app.helpers.running.entries()].map(([id, active]) => { app.helpers.cancel(id); return active.task; }); await Promise.allSettled(helperTasks); if (app.active) { app.pause(app.active.id); await Promise.race([app.active.done, new Promise(r => setTimeout(r, 5000))]); } server.closeAllConnections(); await new Promise(r => server.close(r)); if (Number(fs.readFileSync(lock, 'utf8')) === process.pid) fs.unlinkSync(lock); if (fs.existsSync(stateFile)) fs.unlinkSync(stateFile); }
   return { server, app, store, origin, token, bridgeToken, close };
 }

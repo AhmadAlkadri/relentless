@@ -115,3 +115,17 @@ test('an execution question records the exchange without mutating authorized sco
   app.answer(s.id, { pendingId: app.active.pending.display.id, kind: 'question', answers: { detail: 'Keep the agreed default.' } }); await done;
   assert.equal(store.meta(s.id).status, 'idle'); assert.equal(scopeHash(store.read(s.id).values, s.meta.project), scope);
 });
+
+test('editing the canonical prompt revokes a pending standalone Build approval', async t => {
+  const original = providers.mock; t.after(() => { providers.mock = original; });
+  let approved = false;
+  providers.mock = async ({ interact }) => { const result = await interact({ kind: 'approval', command: 'synthetic fixture write' }); approved = result.allow; return { text: 'Complete.' }; };
+  const { store, app, project } = fixture(); const s = store.create({ backend: 'mock', project });
+  app.prompts.publish(s.id, { text: '# Agreed fixture scope\nWrite one local result.', sourceRevision: contextRevision(s), ready: true });
+  await app.begin(s.id, { action: 'build', revision: s.revision, scope: scopeHash(s.values, s.meta.project), promptRevision: app.prompts.view(s.id).revision, target: s.meta.project, requestId: randomUUID() });
+  const done = app.active.done; await waitFor(() => app.active.pending);
+  fs.writeFileSync(app.prompts.file(s.id), '# Edited scope\nA different result.');
+  assert.throws(() => app.answer(s.id, { pendingId: app.active.pending.display.id, kind: 'approval', allow: true }), /scope changed/);
+  await done;
+  assert.equal(approved, false); assert.equal(store.meta(s.id).status, 'paused');
+});

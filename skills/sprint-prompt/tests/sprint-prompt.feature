@@ -43,7 +43,7 @@ Feature: Client-neutral sprint-prompt handoff
     Then the deliverable is the brief and one-sentence kickoff
     And no step of the briefed work is carried out
 
-  Scenario: Relentless Print stays unsaved
+  Scenario: Relentless Print stays in private session storage
     Given the user asks only to Print inside Relentless
     When a handoff is generated
     Then this saved-brief workflow is not implicitly invoked

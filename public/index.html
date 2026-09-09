@@ -67,6 +67,12 @@
               <article id="stream" class="markdown stream" aria-label="Current response" hidden></article>
               <p id="thinking" class="thinking" role="status" hidden><span class="status-dot"></span><span id="thinking-text">Thinking with you…</span></p>
               <section id="pending" aria-label="Agent question or tool approval" hidden></section>
+              <section id="answer-help" class="answer-help" aria-label="Optional answer assistance">
+                <div class="button-row"><select id="helper-provider" aria-label="Answer helper"><option value="codex">Codex</option><option value="claude">Claude</option></select><button id="helper-start">Draft with Codex</button><button id="helper-cancel" hidden>Cancel helper</button></div>
+                <label class="checkbox-line"><input id="helper-include-draft" type="checkbox"> Include my current answer draft</label>
+                <p class="small muted">Optional private advice. Review the draft before sending your answer.</p>
+                <div id="helper-drafts"></div>
+              </section>
               <section id="composer" class="composer">
                 <div class="editor-heading"><label for="editor-draft">Your space to answer</label><span id="save-draft" class="save-status">Saved locally</span></div>
                 <textarea id="editor-draft" data-section="draft" rows="6" placeholder="Follow the thought. A rough answer, a question back, or “help me think through this” all belong here."></textarea>

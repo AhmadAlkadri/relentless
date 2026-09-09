@@ -16,14 +16,15 @@ export function projectContext(cwd) {
 export const contextRevision = session => hash(JSON.stringify([session.meta.project, publicContext(session.values)]));
 export function attachedQuestion(s) {
   const q = s.meta.attachment?.question; if (!q) return null;
-  for (const match of [...s.values.conversation.matchAll(/```relentless-question\s*\n([\s\S]*?)\n```/g)].reverse()) {
-    try { const block = JSON.parse(match[1]); if (block.id === q.id && Array.isArray(block.questions)) return { ...q, questions: block.questions }; } catch {}
+  for (const match of [...(s.values?.conversation || '').matchAll(/```relentless-question\s*\n([\s\S]*?)\n```/g)].reverse()) {
+    try { const block = JSON.parse(match[1]); if (block.id === q.id && Array.isArray(block.questions)) return { ...q, questions: block.questions, contentRevision: hash(match[1]) }; } catch {}
   }
   return { ...q, questions: [{ id: 'discussion', question: 'The question was edited in Markdown. Review the conversation and reply in your own words.' }] };
 }
 export function returnPane(pane, socket) {
   if (!/^\d+$/.test(pane || '')) return { supported: false, message: 'Return to your original terminal. No WezTerm pane identifier was available.' };
-  try { execFileSync('wezterm', ['cli', 'activate-pane', '--pane-id', pane], { timeout: 3000, stdio: 'pipe', env: { ...process.env, ...(socket ? { WEZTERM_UNIX_SOCKET: socket } : {}) } }); return { supported: true, pane }; }
+  const environment = { ...process.env }; if (socket) environment.WEZTERM_UNIX_SOCKET = socket; else delete environment.WEZTERM_UNIX_SOCKET;
+  try { execFileSync('wezterm', ['cli', 'activate-pane', '--pane-id', pane], { timeout: 3000, stdio: 'pipe', env: environment }); return { supported: true, pane }; }
   catch { return { supported: false, pane, message: 'Handback recorded. Select your original terminal; WezTerm pane activation was unavailable.' }; }
 }
 
@@ -43,7 +44,8 @@ export class Attachments {
   open(owner, { cwd, client, nativeSessionId = null, pane = null, socket = null, title, intent = '', resume } = {}) {
     if (!['codex', 'claude'].includes(client)) throw new Fault('Native client must be codex or claude.');
     const context = projectContext(cwd);
-    const existing = this.store.list().find(m => m.attachment?.owner === owner && m.project === context.project && !['finished', 'returned', 'built'].includes(m.attachment.state));
+    const identity = fs.statSync(context.project);
+    const existing = this.store.list().find(m => m.attachment?.owner === owner && (m.attachment.nativeSessionId || null) === (nativeSessionId || null) && m.project === context.project && m.projectIdentity?.device === identity.dev && m.projectIdentity?.inode === identity.ino && !['finished', 'returned', 'built'].includes(m.attachment.state));
     if (existing) {
       const s = this.store.read(existing.id);
       if (['paused', 'disconnected'].includes(s.meta.attachment.state)) { s.meta.attachment.state = 'attached'; s.meta.status = 'attached'; s.meta.error = null; delete s.meta.promptRequest; this.store.setMeta(s.id, s.meta); }
@@ -57,7 +59,7 @@ export class Attachments {
       if (this.app.active?.id === resume) throw new Fault('Pause the standalone interviewer before resuming its notes.', 409);
       this.store.append(s.id, 'Attachment resumed', 'Saved notes resumed by a new native connection. Prior conversation continuity and Build authorization are not assumed.');
       s = this.store.read(s.id);
-    } else s = this.store.create({ project: context.project, backend: client, title: title || `${path.basename(context.project)}${intent ? ': ' + intent.replace(/\s+/g, ' ').slice(0, 100) : ''}`, context: intent });
+    } else s = this.store.create({ project: context.project, backend: client, title: title || `${path.basename(context.project)}${intent ? ': ' + intent.replace(/\s+/g, ' ').slice(0, 100) : ''}`, context: intent }, { nativeAttachment: true });
     s.meta.attachment = { id: randomUUID(), owner, client, nativeSessionId, identitySource: nativeSessionId ? 'native client supplied' : 'connection only; native session ID unavailable', pane: /^\d+$/.test(pane || '') ? pane : null, socket: typeof socket === 'string' ? socket : null, ...context, state: 'attached', publications: [], events: [], question: null, connected: new Date().toISOString() };
     s.meta.status = 'attached'; s.meta.mode = 'interview'; s.meta.pending = null; s.meta.error = null;
     this.store.setMeta(s.id, s.meta);
@@ -97,11 +99,11 @@ export class Attachments {
     }
     a.publications.push(publicationId); a.state = 'attached'; this.store.setMeta(id, s.meta);
     // Publishing a prompt and its explanatory prose is one native publication.
-    if (promptResult && !promptResult.candidate && sourceRevision === before) this.app.prompts.advanceOwnPublication(id, before, contextRevision(this.store.read(id)));
+    if (promptResult && sourceRevision === before) this.app.prompts.advanceOwnPublication(id, before, contextRevision(this.store.read(id)), promptResult.candidate ? promptResult.id : undefined);
     this.app.event(id, { type: 'complete' });
     return this.snapshot(this.store.read(id));
   }
-  user(id, { action, text = '', revision, requestId, pendingId, answers, promptRevision, target, usePreferences = false }) {
+  user(id, { action, text = '', revision, requestId, pendingId, questionRevision, answers, promptRevision, target, usePreferences = false }) {
     let s = this.store.read(id), a = s.meta.attachment;
     if (!a) throw new Fault('This session is not attached.');
     if (a.events.some(e => e.id === requestId)) return { duplicate: true };
@@ -116,6 +118,7 @@ export class Attachments {
     }
     if (action === 'continue') {
       if (pendingId && a.question?.id !== pendingId) throw new Fault('This question is no longer current. Your draft was preserved.', 409);
+      if (pendingId && questionRevision !== attachedQuestion(s)?.contentRevision) throw new Fault('Question changed in Markdown. Review it before submitting; your writing is preserved.', 409);
       if (answers) { if (!Object.values(answers).every(x => typeof x === 'string')) throw new Fault('Answers must be text.'); text = Object.entries(answers).map(([k, v]) => `${k}: ${v}`).join('\n\n'); }
       if (!text.trim()) throw new Fault('Write an answer or ask for help thinking it through.');
       this.store.append(id, 'You', text);

@@ -72,10 +72,64 @@ test('Build without prompt only prepares; return while thinking finishes without
   const next = fixture(); ready(next); const p = next.app.prompts.view(next.id); user(next, { action: 'build', promptRevision: p.revision, target: next.project }); next.app.attachments.disconnect(next.owner);
   assert.equal(next.store.meta(next.id).attachment.events[0].revoked, true); assert.equal(next.store.meta(next.id).attachment.state, 'disconnected');
 });
+
+test('Print and premature Build reuse a current candidate without regenerating or replacing manual scope', async () => {
+  const f = fixture(); ready(f);
+  const original = f.app.prompts.view(f.id);
+  fs.writeFileSync(f.app.prompts.file(f.id), original.text + '\nManual exclusion.');
+  user(f, { action: 'continue', text: 'Later public correction.' });
+  const source = contextRevision(f.store.read(f.id));
+  post(f, { prompt: '# Reconciled proposal\nPreserve the exclusion and apply the correction.', sourceRevision: source, promptBaseRevision: f.app.prompts.view(f.id).revision, discussion: 'The replacement is proposed for your review.', ready: false });
+  const p = f.app.prompts.view(f.id), events = f.store.meta(f.id).attachment.events.length;
+  assert.equal(p.candidates[0].sourceRevision, contextRevision(f.store.read(f.id)));
+  assert.equal(p.current, false);
+  const printed = await f.app.print(f.id, f.store.read(f.id).revision);
+  assert.equal(printed.reviewRequired, true);
+  assert.equal(printed.text, original.text + '\nManual exclusion.');
+  const built = await user(f, { action: 'build' }); assert.equal(built.reviewRequired, true);
+  assert.equal(f.store.meta(f.id).attachment.events.length, events, 'neither a new synthesis nor execution event was enqueued');
+  assert.equal(f.app.prompts.view(f.id).ready, false);
+});
+
+test('new known native conversation or replaced directory cannot reuse the previous interview', () => {
+  const f = fixture();
+  const first = f.app.attachments.open(f.owner, { cwd: f.project, client: 'claude', nativeSessionId: randomUUID() });
+  const second = f.app.attachments.open(f.owner, { cwd: f.project, client: 'claude', nativeSessionId: randomUUID() });
+  assert.notEqual(first.session, second.session);
+  fs.renameSync(f.project, f.project + '-previous'); fs.mkdirSync(f.project);
+  const replacement = f.app.attachments.open(f.owner, { cwd: f.project, client: 'codex' });
+  assert.notEqual(replacement.session, f.id);
+  assert.equal(f.store.read(replacement.session).values.conversation, '');
+});
+
+test('native attachment can discuss its own source checkout while standalone still rejects it', () => {
+  const f = fixture(); f.store.repo = f.project;
+  assert.throws(() => f.store.create({ project: f.project, nativeAttachment: true }), /specific project/);
+  const opened = f.app.attachments.open(randomUUID(), { cwd: f.project, client: 'codex' });
+  assert.equal(f.store.read(opened.session).meta.project, f.project);
+  assert.deepEqual(f.store.meta(opened.session).providers, {});
+  assert.throws(() => f.app.attachments.open(randomUUID(), { cwd: f.store.root, client: 'codex' }), /specific project/);
+});
 test('browser capability cannot invoke bridge or discover ownership secret', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'relentless-bridge-http-')), s = await startServer({ root });
   try {
     const response = await fetch(s.origin + '/api/bridge/open_interview', { method: 'POST', headers: { Authorization: `Bearer ${s.token}`, Origin: s.origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ owner: randomUUID(), cwd: root, client: 'codex' }) });
     assert.equal(response.status, 401);
   } finally { await s.close(); }
+});
+
+test('externally edited question refuses the old answer revision and keeps current question', () => {
+  const f=fixture();post(f,{questions:[{id:'q1',question:'Original question?'}]});const old=f.app.view(f.id).meta.attachment.question;
+  const s=f.store.read(f.id);fs.writeFileSync(s.path,s.raw.replace('Original question?','Changed question?'));
+  const changed=f.app.view(f.id).meta.attachment.question;assert.notEqual(changed.contentRevision,old.contentRevision);
+  assert.throws(()=>f.app.answer(f.id,{pendingId:old.id,questionRevision:old.contentRevision,kind:'question',answers:{q1:'Old reply'}}),/Question changed/);
+  assert.equal(f.store.meta(f.id).attachment.events.length,0);
+  f.app.answer(f.id,{pendingId:changed.id,questionRevision:changed.contentRevision,kind:'question',answers:{q1:'Reviewed changed question'}});
+  assert.equal(f.store.meta(f.id).attachment.events.length,1);
+});
+test('missing candidate and malformed session do not hide the canonical recovery view', () => {
+ const f=fixture();ready(f);const s=f.store.read(f.id),p=f.app.prompts.view(f.id);
+ const c=f.app.prompts.publish(f.id,{text:'Older candidate',sourceRevision:'old',baseRevision:p.revision});fs.unlinkSync(f.store.file(f.id,`candidate-${c.id}.md`));
+ assert.equal(f.app.view(f.id).prompt.candidates[0].missing,true);
+ fs.writeFileSync(s.path,'# Partially saved editor content');const view=f.app.view(f.id);assert.equal(view.values,null);assert.equal(view.prompt.ready,false);assert.match(view.raw,/Partially/);
 });

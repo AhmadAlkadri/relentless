@@ -13,7 +13,7 @@ let selected = fragment.get('session') || localStorage.getItem('relentless-last-
 let tuneOnOpen = fragment.get('tune') === '1';
 let state = null, current = null, busy = false, polling = false;
 let navigationSignature = '', conversationSignature = '', streamSignature = '', pendingSignature = '', tuneSignature = '', suggestionsSignature = '';
-let noticeTimer, awaitingPrint = false;
+let noticeTimer, awaitingPrint = null, helperSignature = '';
 const buffers = new Map();
 const sectionLabels = { brief: 'Working brief', decisions: 'Accepted decisions', facts: 'Verified facts', assumptions: 'Assumptions', questions: 'Current questions', scratchpad: 'Private scratchpad' };
 const defaults = { theme: 'system', size: 18, width: 760, focus: false };
@@ -230,9 +230,10 @@ function renderSession() {
   if (attached) $('mode-badge').textContent = `${attached.client === 'codex' ? 'Codex' : 'Claude'} · Attached interviewer`;
   $('privacy-note').textContent = attached ? `This is your original native conversation’s sidecar. ${attached.nativeSessionId ? 'Native session identity captured.' : 'Continuity is tied to this live MCP connection; native session ID is unavailable.'} Answer helpers are separate and optional.` : 'Standalone: a separate app-owned conversation. Submitted public context goes to its provider. Drafts and scratchpad stay local.';
   $('interview-button').hidden = Boolean(attached); $('return-button').hidden = !attached; $('return-button').disabled = ended || finishing;
-  if (ended || finishing) { $('session-alert').hidden = false; $('session-alert').textContent = ended ? `Interview ${attached.state}. Your record and working prompt are preserved. Return to your original terminal. Reopen Relentless there to resume.` : 'Finishing at the next native tool boundary. Native computation may still be running; no cancellation is claimed.'; }
   $('session-kicker').textContent = m.mode === 'build' ? 'MAKING THE AGREED SCOPE REAL' : 'THINKING TOGETHER';
   $('session-alert').hidden = !(invalid || m.error); $('session-alert').textContent = current.error || m.error || '';
+  if (ended || finishing) { $('session-alert').hidden = false; $('session-alert').textContent = ended ? `Interview ${attached.state}. Your record and working prompt are preserved. Return to your original terminal. Reopen Relentless there to resume.` : 'Finishing at the next native tool boundary. Native computation may still be running; no cancellation is claimed.'; }
+
   $('recovery-actions').hidden = !(interrupted || invalid || m.status === 'paused'); $('acknowledge-button').hidden = !interrupted; $('reconcile-button').hidden = !interrupted;
   $('interview-button').textContent = current.values?.conversation ? 'Resume interview' : 'Start interview';
   for (const id of ['interview-button', 'summary-button', 'continue-button', 'tune-button', 'build-button']) $(id).disabled = busy || active || Boolean(state?.active) || interrupted || invalid || ended || finishing;
@@ -251,10 +252,10 @@ function renderSession() {
   $('build-target').textContent = m.project || 'No target directory. Start a project-linked session to execute.';
   const scopeText = current.prompt?.text || 'Prepare the working prompt with Print before execution. No scope is authorized yet.';
   $('prompt-status').textContent = current.prompt ? `Revision ${String(current.prompt.revision || 'candidate').slice(0, 12)} · ${!current.prompt.current ? 'Potentially outdated' : current.prompt.ready ? 'Ready to Build' : 'Provisional / review required'}${current.prompt.manual ? ' · Edited by you' : ''}` : 'No working prompt yet';
-  if (awaitingPrint && current.prompt?.current) { awaitingPrint = false; reviewPrompt(); }
+  if (awaitingPrint === selected && (current.prompt?.current || (!m.promptRequest && current.prompt?.candidates?.length))) { awaitingPrint = null; reviewPrompt(); }
   if ($('build-scope').dataset.scope !== scopeText && renderMarkdown($('build-scope'), scopeText)) $('build-scope').dataset.scope = scopeText;
   const loaded = m.protocol ? m.protocol.slice(0, 12) : 'loaded on first turn'; $('protocol-info').textContent = `Method: ${loaded}. Current source: ${current.currentProtocol.slice(0, 12)}.${m.protocol && m.protocol !== current.currentProtocol ? ' The new method loads on the next turn boundary.' : ''} Provider session identifiers remain in the local metadata sidecar.`;
-  renderPending(); renderTune(); renderSuggestions(); updateSaveSummary();
+  renderPending(); renderHelpers(); renderTune(); renderSuggestions(); updateSaveSummary();
 }
 async function startTurn(action) {
   if (busy) return;
@@ -265,14 +266,14 @@ async function startTurn(action) {
   busy = true; renderSession();
   try {
     const response = await sessionApi('turn', { action, text: submitted, ...reviewed, requestId: crypto.randomUUID(), usePreferences: $('use-preferences').checked });
-    if (response.preparing) { awaitingPrint = true; notice(response.message); }
+    if (response.preparing || response.reviewRequired) { awaitingPrint = id; notice(response.message); }
     if (action === 'continue' && selected === id) { if (b.text === submitted) b.text = ''; b.base = ''; b.dirty = b.text !== ''; b.conflict = false; rememberBuffer('draft', b); }
     if (selected === id) { await refreshState(); await refreshSession(); }
   } finally { busy = false; renderSession(); }
 }
 for (const [id, action] of [['interview-button', 'interview'], ['summary-button', 'summary'], ['continue-button', 'continue'], ['tune-button', 'tune'], ['build-button', 'build']]) $(id).addEventListener('click', () => run(() => startTurn(action)));
 $('pause-button').addEventListener('click', () => run(async () => { await sessionApi('pause', {}); notice('Pause requested. Completed text and recovery remain local.'); await refreshSession(); }));
-$('print-button').addEventListener('click', () => run(async () => { const result = await sessionApi('print', { revision: current.revision }); if (result.preparing) { awaitingPrint = true; notice(result.message); } else { await refreshSession(); reviewPrompt(); } }));
+$('print-button').addEventListener('click', () => run(async () => { const id = selected; const result = await sessionApi('print', { revision: current.revision }); awaitingPrint = id; if (result.preparing) notice(result.message); else if (selected === id) { await refreshSession(); if (awaitingPrint === id) { awaitingPrint = null; reviewPrompt(); } } }));
 $('review-prompt-button').addEventListener('click', () => run(() => current.prompt ? reviewPrompt() : $('print-button').click()));
 $('return-button').addEventListener('click', () => run(async () => { await sessionApi('return', { requestId: crypto.randomUUID() }); await refreshSession(); }));
 function reviewPrompt() {
@@ -282,11 +283,11 @@ function reviewPrompt() {
   const area = el('textarea', { class: 'export-text', value: readLocal(key, p.text), 'aria-label': 'Working execution prompt', spellcheck: false });
   area.addEventListener('input', () => writeLocal(key, area.value));
   const ready = el('input', { type: 'checkbox', checked: p.ready });
-  const proposed = el('div');
+  const proposed = el('div', { class: 'prompt-candidates' });
   for (const candidate of p.candidates || []) proposed.append(el('details', {}, el('summary', { text: `Proposed replacement · ${candidate.sourceRevision === sourceRevision ? 'current context' : 'older context'}` }), el('pre', { text: candidate.text }), button('Review replacement in editor', () => { writeLocal(key + ':previous', area.value); area.value = candidate.text; area.dispatchEvent(new Event('input')); ready.checked = false; notice('Previous editor text preserved locally. Review this proposal and its freshness before saving.'); })));
   openModal('Working execution prompt', el('div', {}, el('p', { class: 'modal-help', text: `${p.path} · revision ${String(revision || 'candidate').slice(0,12)}. ${p.current ? '' : 'Potentially outdated: reconcile changed context before Build.'} Print and Build use this exact saved body. Saving here grants no execution authority.` }), area, proposed,
     el('label', { class: 'checkbox-line' }, ready, ' This proposed scope is clear enough to begin; no blocking decisions remain'),
-    el('div', { class: 'modal-actions' }, button('Copy', () => copy(p.text)), button('Export saved .md…', () => showText('Export working execution prompt', p.text, 'relentless-execution-prompt.md')), button('Save reviewed prompt', async () => { await sessionApi('prompt-edit', { text: area.value, revision, sourceRevision, ready: ready.checked }); localStorage.removeItem(key); closeModal(); await refreshSession(); notice('Working prompt saved. Build is a separate deliberate action.'); }, { class: 'primary' }))));
+    el('div', { class: 'modal-actions' }, button('Copy', () => copy(area.value)), button('Export saved .md…', () => showText('Export working execution prompt', p.text, 'relentless-execution-prompt.md')), button('Save reviewed prompt', async () => { await sessionApi('prompt-edit', { text: area.value, revision, sourceRevision, ready: ready.checked }); localStorage.removeItem(key); closeModal(); await refreshSession(); notice('Working prompt saved. Build is a separate deliberate action.'); }, { class: 'primary' }))));
 }
 $('export-button').addEventListener('click', () => run(async () => { const result = await sessionApi('export', {}); showText('Take the thought with you', result.text, 'relentless-chatgpt-context.md', 'Copy into a new ChatGPT conversation, or explicitly save and upload this Markdown. Generated from the canonical method and compact public context. Local skills do not automatically sync to ChatGPT web.'); }));
 $('copy-path-button').addEventListener('click', () => run(() => copy(current.path)));
@@ -297,7 +298,7 @@ $('acknowledge-button').addEventListener('click', () => run(async () => { await 
 $('stop-button').addEventListener('click', () => { openModal('Close the local workspace?', el('div', {}, el('p', { text: 'The application will pause an active turn and stop its local server. Saved Markdown stays on disk. Unsaved text remains in this browser’s recovery storage. Run relentless to reopen.' }), el('div', { class: 'modal-actions' }, button('Keep thinking', closeModal), button('Stop application', async () => { await api('stop', {}); closeModal(); capability = null; sessionStorage.removeItem('relentless-capability'); notice('Application stopped. Run relentless to reopen your workspace.'); $('connection').textContent = 'Stopped'; }, { class: 'primary' })))); });
 
 function renderPending() {
-  const pending = current.meta.attachment?.question || current.active?.pending || (current.meta.status === 'uncertain' ? current.meta.pending : null), recovered = Boolean(pending && !current.active?.pending && !current.meta.attachment); const signature = `${pending?.id || ''}:${recovered}`;
+  const pending = current.meta.attachment?.question || current.active?.pending || (current.meta.status === 'uncertain' ? current.meta.pending : null), recovered = Boolean(pending && !current.active?.pending && !current.meta.attachment); const signature = `${pending?.id || ''}:${pending?.contentRevision || ''}:${recovered}`;
   if (signature === pendingSignature) return; pendingSignature = signature; $('pending').hidden = !pending; $('pending').replaceChildren(); if (!pending) return;
   if (pending.kind === 'approval' && recovered) {
     $('pending').append(el('div', { class: 'pending-card' }, el('p', { class: 'eyebrow', text: 'INTERRUPTED TOOL APPROVAL' }), el('h2', { text: pending.tool || 'Previous tool request' }), el('p', { class: 'small muted', text: 'The callback ended when the server stopped. This retained request cannot be approved. Check provider state and target files before acknowledging the interruption.' }), el('pre', { text: JSON.stringify(pending.input, null, 2) }))); return;
@@ -318,7 +319,7 @@ function renderPending() {
   });
   const submit = button('Send answer', async () => {
     const values = Object.fromEntries(Object.entries(answers).map(([key, area]) => [key, area.value])); if (!Object.values(values).some(x => x.trim())) throw new Error('Write anything that helps, including a question back.');
-    submit.disabled = true; try { await sessionApi('answer', { pendingId: pending.id, kind: 'question', answers: values }); for (const key of Object.keys(values)) localStorage.removeItem(`relentless-question:${selected}:${pending.id}:${key}`); await refreshSession(); } finally { submit.disabled = false; }
+    submit.disabled = true; try { await sessionApi('answer', { pendingId: pending.id, questionRevision: pending.contentRevision, kind: 'question', answers: values }); for (const key of Object.keys(values)) localStorage.removeItem(`relentless-question:${selected}:${pending.id}:${key}`); await refreshSession(); } finally { submit.disabled = false; }
   }, { class: 'primary', disabled: recovered });
   $('pending').append(el('div', { class: 'pending-card' }, el('p', { class: 'eyebrow', text: recovered ? 'QUESTION RETAINED AFTER INTERRUPTION' : 'A QUESTION TO THINK WITH' }), ...fields, recovered ? button('Copy answer to draft', () => { const b = editor('draft'); if (b.dirty || b.text.trim()) throw new Error('Save or submit your current draft before copying this retained answer into it.'); b.text = Object.values(answers).map(area => area.value).filter(Boolean).join('\n\n'); b.dirty = b.text !== b.base; rememberBuffer('draft', b); syncEditors(); notice('Answer copied to your local draft. Acknowledge the interrupted turn before explicitly continuing.'); }) : submit, el('p', { class: 'small muted', text: recovered ? 'The previous question callback ended. Your answers remain local and editable. Check provider state, then acknowledge the interruption and deliberately submit a new turn.' : 'Your answer continues the interview. It cannot approve tools or authorize execution.' })));
 }
@@ -376,3 +377,45 @@ async function poll() {
 if (!capability) notice('Open this workspace with the relentless command to establish its private local connection.', true);
 else run(async () => { await poll(); if (selected) await selectSession(selected); if (tuneOnOpen && current) { tuneOnOpen = false; await startTurn('tune'); } });
 setInterval(poll, 1100);
+
+function selectedHelperDraft() {
+  const fields = [...$('pending').querySelectorAll('textarea')];
+  return fields.length ? fields.map(node => node.value).join('\n\n') : editor('draft').text;
+}
+$('helper-provider').addEventListener('change', () => { $('helper-start').textContent = `Draft with ${$('helper-provider').value === 'codex' ? 'Codex' : 'Claude'}`; });
+$('helper-start').addEventListener('click', () => run(async () => {
+  await sessionApi('helper-start', { provider: $('helper-provider').value, questionId: current.helperQuestion.id, contextRevision: current.contextRevision, includeDraft: $('helper-include-draft').checked, draft: $('helper-include-draft').checked ? selectedHelperDraft() : '', usePreferences: $('use-preferences').checked });
+  await refreshSession();
+}));
+$('helper-cancel').addEventListener('click', () => run(async () => { await sessionApi('helper-cancel', {}); await refreshSession(); }));
+function insertHelperDraft(text, helper) {
+  if (helper.stale) throw new Error('This suggestion belongs to an older question or context. Copy useful text deliberately; your current answer is preserved.');
+  const fields = [...$('pending').querySelectorAll('textarea')], field = fields.length === 1 ? fields[0] : $('editor-draft');
+  const sessionAtReview = selected, questionAtReview = current.helperQuestion.id;
+  const apply = value => { if (selected !== sessionAtReview || current.contextRevision !== helper.contextRevision || current.helperQuestion.id !== questionAtReview || !field.isConnected || current.helpers.find(h => h.id === helper.id)?.stale) throw new Error('The question or context changed during review. Your writing and suggestion remain preserved; review the current question first.'); field.value = value; field.dispatchEvent(new Event('input', { bubbles: true })); field.focus(); closeModal(); notice('Draft inserted for your review. It has not been sent.'); };
+  if (!field.value.trim()) { apply(text); return; }
+  const mine = el('textarea', { value: field.value, 'aria-label': 'Your current answer', readOnly: true });
+  const proposal = el('textarea', { value: text, 'aria-label': 'Suggested answer to insert' });
+  openModal('Keep your writing', el('div', {}, el('p', { text: 'Your answer already has text. Choose how to use the helper suggestion; nothing is submitted.' }), el('div', { class: 'compare-grid' }, mine, proposal), el('div', { class: 'modal-actions' }, button('Keep my answer', closeModal), button('Append suggestion', () => apply(field.value + '\n\n' + proposal.value)), button('Replace with reviewed draft', () => apply(proposal.value)))));
+}
+function renderHelpers() {
+  const helpers = current.helpers || [], active = helpers.some(h => ['running', 'terminal'].includes(h.status));
+  $('helper-start').disabled = active || !current.values || current.meta.attachment?.state === 'finishing'; $('helper-cancel').hidden = !helpers.some(h => h.status === 'running');
+  const signature = JSON.stringify([selected, helpers]); if (signature === helperSignature) return; helperSignature = signature;
+  $('helper-drafts').replaceChildren(...helpers.slice().reverse().map(h => {
+    const label = `${h.provider === 'codex' ? 'Codex' : 'Claude'}${h.model ? ' · ' + h.model : ''}`;
+    const key = `relentless-helper-edit:${selected}:${h.id}:${h.revision}`, area = el('textarea', { value: readLocal(key, h.draft), 'aria-label': `Drafted by ${label} · Not sent` });
+    area.addEventListener('input', () => writeLocal(key, area.value));
+    return el('details', { class: 'helper-card', open: true }, el('summary', { text: `${h.draft ? 'Drafted by' : 'Drafting with'} ${label} · Not sent${h.stale ? ' · Older suggestion' : ''}` }),
+      h.error ? el('p', { class: 'callout', text: h.error }) : null,
+      ['running', 'terminal'].includes(h.status) ? el('p', { class: 'small muted', text: h.status === 'terminal' ? 'Private discussion is owned by its WezTerm tab. Exit that helper to return a draft here.' : 'The helper is thinking. Your writing remains available.' }) : null,
+      h.draft ? area : null, h.draft ? el('div', { class: 'button-row' }, button('Use this draft', () => insertHelperDraft(area.value, h), { disabled: h.stale }), button('Copy suggestion', () => copy(area.value)), button('Discuss this draft', () => discussHelper(h, area.value)), button('Discuss in WezTerm', async () => { const result = await sessionApi('helper-discuss', { helperId: h.id, includeDraft: true, draft: area.value }); notice(`Opened this exact helper session in pane ${result.pane} with your reviewed draft. Exit the helper when ready to return a draft.`); await refreshSession(); }, { disabled: active })) : null);
+  }));
+}
+function discussHelper(helper, displayedDraft) {
+  const discussion = el('article', { class: 'markdown' }); renderMarkdown(discussion, helper.discussion);
+  const key = `relentless-helper-message:${selected}:${helper.id}`, message = el('textarea', { value: readLocal(key, ''), rows: 5, 'aria-label': 'Private message to helper', placeholder: 'Discuss the tradeoff or refine the draft privately.' });
+  message.addEventListener('input', () => writeLocal(key, message.value));
+  openModal('Private helper discussion', el('div', {}, el('p', { class: 'modal-help', text: 'This resumes the exact helper session and includes the draft you were viewing or editing. Only the answer you later submit enters the main interview.' }), discussion, message,
+    button('Send to helper', async () => { await sessionApi('helper-start', { provider: helper.provider, helperId: helper.id, message: message.value, includeDraft: true, draft: displayedDraft, questionId: current.helperQuestion.id, contextRevision: current.contextRevision }); localStorage.removeItem(key); closeModal(); await refreshSession(); }, { class: 'primary' })));
+}

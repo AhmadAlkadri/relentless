@@ -2,6 +2,7 @@
 name: relentless
 description: Think through a project conversationally, preserve decisions in a live Markdown workspace, and deliberately Print a handoff or Build an agreed scope. Invoke explicitly for an interview; ordinary project discussion does not activate this workflow.
 disable-model-invocation: true
+allowed-tools: mcp__relentless__open_interview, mcp__relentless__publish_interview, mcp__relentless__await_interview, mcp__relentless__attachment_status
 metadata:
   protocol-version: "2.0.0"
 ---
@@ -47,7 +48,7 @@ Acknowledge each delivered event ID. Acknowledgment can use waitMs 1 as a single
 transport operation before thinking; do not use short waits as a polling loop.
 After an idle `pending` result, issue another long wait on the SAME attachment.
 In interactive Claude Code a call can background after two minutes. It is STILL
-PENDING: wait for the native task completion notification; do not finish, repeat
+PENDING: use the native task-wait facility when available, or wait for the native task completion notification; do not finish, repeat
 the question, inspect unrelated work, or implement. Cancellation of a tool call is
 not Return or Build. If the user interrupts in the terminal, state the pending
 status and recover the same attachment deliberately. If the client cannot resume
