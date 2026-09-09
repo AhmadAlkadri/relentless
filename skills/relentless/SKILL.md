@@ -4,7 +4,7 @@ description: Think through a project conversationally, preserve decisions in a l
 disable-model-invocation: true
 allowed-tools: mcp__relentless__open_interview, mcp__relentless__publish_interview, mcp__relentless__await_interview, mcp__relentless__attachment_status
 metadata:
-  protocol-version: "2.0.0"
+  protocol-version: "2.0.1"
 ---
 
 # Relentless
@@ -21,8 +21,13 @@ separate synthesis request to replace yourself. Do not copy or replay the native
 transcript into another process. An explicitly requested answer helper is a
 separate advisor and is allowed; its output remains an unsubmitted draft.
 
-Call `open_interview` with YOUR current absolute working directory. Retain the
-invocation subdirectory; the bridge resolves the Git worktree root. Choose an
+Call `open_interview` with `cwd` set to the selected absolute project operating
+directory, defaulting to YOUR actual invocation directory. When the user selects
+another local project, inspect its real directory and relevant instructions, then
+pass that directory without pretending the native shell moved. Retain the selected
+subdirectory; the bridge resolves its Git worktree root. This caller-supplied path
+selects a target, not proof of native cwd or execution authority. Check the returned
+`target`, `selection` and `session` before publishing project context. Choose an
 editable project-and-intent title without a setup form. Supply known public intent,
 not secrets or unrelated history. For Claude Code, the supported current native
 session identifier is `${CLAUDE_SESSION_ID}`; pass the expanded value as
@@ -30,9 +35,36 @@ session identifier is `${CLAUDE_SESSION_ID}`; pass the expanded value as
 by the native client or supported session hook; never guess environment names,
 read transcripts, or use the newest session. Connection-only identity is honest
 when the native ID is unavailable. WezTerm pane and socket are captured by the
-bridge from documented inherited variables. An open on the same connection reuses
-its sidecar. `resume` with a saved session ID resumes notes and labels any new
+bridge from documented inherited variables. An open on the same connection and
+native identity reuses that project's sidecar. A different project receives a
+separate session; selecting A, then B, then A preserves each project's context and
+prompt. `resume` explicitly selects the saved session ID and rejects a different
+target rather than silently choosing another open interview. It resumes notes and labels any new
 native connection honestly; it never restores Build authorization.
+
+For an explicitly requested portfolio workflow, keep one foreground interview.
+Maintain its project/session mapping and compact status in an existing private
+coordination session's Markdown, publishing through the original native bridge.
+Label that session as portfolio coordination; give it no working execution prompt,
+interview question or Build authority. This is an index of project paths, evidence, decisions,
+open questions, session IDs, prompt revisions, authorization receipts, current
+slices, owned workers/processes, verified results and next actions. Keep each actual
+working prompt in its session's canonical prompt file. Do not create project-local
+management files or copy unrelated transcripts, private drafts or the full ledger
+into project interviews or helpers/workers. A plain private Markdown index under
+the data home with owner-only permissions is an optional alternative when needed.
+The ledger records observations and cannot grant authority.
+Revalidate attachment status and uncertain execution when resuming; never replay a
+Build merely because the ledger says it was approved. This note is not a scheduler.
+
+After acknowledging an exact-target Build, the original conversation may coordinate
+a bounded implementation worker if the user's authorized scope permits delegation.
+Give it only that target's exact authorized prompt and necessary public evidence;
+retain review and reporting in the original conversation. Restricted answer helpers
+are advisers, never implementation workers. Start with at most one active write
+worker. Move to another interview only when the current user question is resolved
+and authorized execution can safely proceed independently. Opening the next project
+grants it no authority and does not cancel, transfer or supervise existing work.
 
 Publish your substantive discussion as well as questions through
 `publish_interview`. Use unique publication UUIDs and stable question IDs. The

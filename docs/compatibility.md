@@ -13,8 +13,16 @@ controls or acknowledge handback. Event UUIDs, publication IDs, source hashes,
 question revisions and prompt hashes bind operations. A delivered Build is never
 returned a second time as authority. Crash/disconnect revokes unacknowledged Build.
 
-Project context comes from the native agent's invocation directory, resolved through
-Git's worktree root and realpath. Invocation subdirectories are retained. No remote
+The existing `cwd` argument selects an absolute project operating directory,
+defaulting by skill guidance to the native agent's actual invocation directory.
+An explicitly selected different project is resolved through Git's worktree root
+and realpath without changing the native process cwd. The bridge verifies the
+selected filesystem target, not the caller's assertion about native cwd. Snapshots
+expose canonical `target` even before a prompt exists, plus `selection.directory`,
+`selection.resolvedDirectory` and its caller-supplied provenance. Selection records
+the latest open; legacy `invocation` and `resolvedInvocation` retain their originally
+supplied paths and are not native cwd proof. Older notes remain readable without a
+migration, with explicit legacy provenance in snapshots. No remote
 URL or newest-session heuristic identifies a project or native owner. Claude's
 `${CLAUDE_SESSION_ID}` skill substitution is supported. Codex generic MCP does not
 provide a verified native thread ID here: absent one explicitly supplied by the
@@ -22,6 +30,16 @@ native client, identity is honestly connection-only. New-session note resumption
 is labeled as such. A changed known native session ID or replaced project inode
 cannot reuse the previous attachment. Native attachment may interview the Relentless
 source checkout itself, while the standalone provider still cannot target it. No terminal scraping, transcript rewriting or token extraction.
+
+The same owner and native identity can select A, then B, then A, retaining separate
+sessions and exact-target prompts. Explicit `resume` takes precedence over automatic
+reuse and rejects a mismatched target, including when that target already has an
+open interview. This is routing, not a permission change: Build still checks the
+session's current prompt revision, exact target and original project inode.
+Portfolio notes can use an existing private coordination session's Markdown outside
+the source checkout, explicitly published to the original master conversation.
+They are never automatically copied to project interviews, helpers or workers.
+They are neither authorization nor a worker scheduler or watchdog.
 
 [Codex MCP](https://developers.openai.com/codex/mcp) documents user configuration
 and the default 60-second tool timeout. The installer sets this server's timeout to

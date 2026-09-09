@@ -350,3 +350,53 @@ external Markdown replacement and refresh, Where are we, Print, deliberate Build
 of only the exact greeting file, Tune review, preserved unsent writing and browser
 Pause. Zero page errors were reported. The earlier failed Tune run is retained above
 as failure evidence; no personal method/preference proposal was applied.
+
+## 2026-09-09: explicit project selection from one native conversation
+
+The root dogfood orchestrator reported a live native `open_interview` launched from
+a portfolio directory: the sidecar used that parent target despite an intent/title
+naming a child project. It then inspected the browser and confirmed the parent path
+under the child-project title. No private title, path, transcript or session content
+is reproduced here. Source inspection confirmed the old canonical skill and MCP
+description required actual native cwd, although the bridge already keyed separate
+attachments by selected worktree, project inode, owner and known native session ID.
+This evidence identifies a selection/protocol mismatch, not a loss of Build isolation.
+
+Three new deterministic regression cases failed before the fix: snapshots omitted
+the selected target and directory provenance, and explicit resume of A with B's
+directory silently returned an already open B instead of rejecting the mismatch.
+The runtime now exposes target and honest caller-supplied selection, retains legacy
+supplied-path fields, and honors exact saved-session selection before automatic
+reuse. The existing `cwd` MCP schema and Build authorization checks are unchanged.
+The canonical skill (2.0.1), MCP description and compatibility guidance explain the
+selected operating directory without claiming that the native process cwd changed.
+An existing private coordination session can hold the portfolio ledger; it has no
+execution prompt or authority and is not copied automatically into project contexts.
+
+Verification performed by the implementation worker:
+
+- `node --test test/attachment.test.mjs`: **15/15 passed**, exit 0.
+- `npm test`: **85/85 passed**, exit 0.
+- `npm run check`: passed JavaScript syntax, canonical skill metadata and whitespace,
+  exit 0.
+- The new A, B, A fixture used one owner and one explicitly supplied synthetic
+  native ID, preserving each session, submitted exchanges and canonical prompt.
+  Snapshots excluded the other project's context and private scratchpad/draft
+  sentinels; process cwd stayed unchanged. Cross-target and cross-revision Build
+  requests were rejected. Exact A Build was delivered once with its unchanged body,
+  target and revision; B gained no control or authority. No app-owned provider ran.
+- Subdirectory/symlink reselection retained legacy path provenance, and old notes
+  without the new selection field remained readable. Explicit resume selected the
+  requested saved notes even with another interview open for the same target; notes
+  resumed by a new owner had no restored ready prompt or pending Build control.
+
+These are synthetic state-machine tests, not live native switching, browser rendering,
+worker execution, process supervision or a portfolio-wide Build certification. The
+root will verify the interrupted native operation separately after integration. The
+worker did not access or mutate live sessions, install configuration, start a provider,
+or restart any service. The shared UI service must reload `src/attachment.mjs`; a safe
+idle service restart suffices. Existing MCP processes call `connection()` for each
+request and retain their owner, so no native conversation restart or reinstall is
+needed. An already loaded MCP tool description may remain old until the client's
+next ordinary restart; its parameter schema is compatible and the canonical skill
+is read from the updated source.

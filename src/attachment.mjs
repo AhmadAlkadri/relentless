@@ -6,12 +6,14 @@ import { Fault, hash, publicContext } from './storage.mjs';
 import { protocol } from './protocol.mjs';
 
 export function projectContext(cwd) {
-  if (typeof cwd !== 'string' || !path.isAbsolute(cwd)) throw new Fault('Supply the native conversation working directory as an absolute path.');
+  if (typeof cwd !== 'string' || !path.isAbsolute(cwd)) throw new Fault('Supply the selected project operating directory as an absolute path.');
   const invocation = path.resolve(cwd), resolved = fs.realpathSync(invocation);
-  if (!fs.statSync(resolved).isDirectory()) throw new Fault('Invocation directory is unavailable.');
+  if (!fs.statSync(resolved).isDirectory()) throw new Fault('Selected directory is unavailable.');
   let project = resolved;
   try { project = fs.realpathSync(execFileSync('git', ['-C', resolved, 'rev-parse', '--show-toplevel'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()); } catch {}
-  return { invocation, resolvedInvocation: resolved, project };
+  // Keep legacy supplied-path fields readable. Neither those names nor this
+  // caller-supplied selection prove the native process's actual working directory.
+  return { invocation, resolvedInvocation: resolved, project, selection: { directory: invocation, resolvedDirectory: resolved, source: 'caller-supplied cwd; native cwd not verified' } };
 }
 export const contextRevision = session => hash(JSON.stringify([session.meta.project, publicContext(session.values)]));
 export function attachedQuestion(s) {
@@ -39,22 +41,25 @@ export class Attachments {
   }
   snapshot(s) {
     const a = s.meta.attachment;
-    return { session: s.id, attachment: a.id, state: a.state, contextRevision: contextRevision(s), publicContext: publicContext(s.values), question: attachedQuestion(s), prompt: this.app.prompts.view(s.id), exchanges: (a.events || []).filter(e => e.kind === 'answer').map(e => e.id), pendingControl: a.events.find(e => !e.ack && !e.revoked && ['build', 'return', 'pause'].includes(e.kind))?.kind || null };
+    const selection = a.selection || { directory: a.invocation, resolvedDirectory: a.resolvedInvocation, source: 'legacy caller-supplied cwd; native cwd not verified' };
+    return { session: s.id, attachment: a.id, target: s.meta.project, selection, state: a.state, contextRevision: contextRevision(s), publicContext: publicContext(s.values), question: attachedQuestion(s), prompt: this.app.prompts.view(s.id), exchanges: (a.events || []).filter(e => e.kind === 'answer').map(e => e.id), pendingControl: a.events.find(e => !e.ack && !e.revoked && ['build', 'return', 'pause'].includes(e.kind))?.kind || null };
   }
   open(owner, { cwd, client, nativeSessionId = null, pane = null, socket = null, title, intent = '', resume } = {}) {
     if (!['codex', 'claude'].includes(client)) throw new Fault('Native client must be codex or claude.');
     const context = projectContext(cwd);
     const identity = fs.statSync(context.project);
-    const existing = this.store.list().find(m => m.attachment?.owner === owner && (m.attachment.nativeSessionId || null) === (nativeSessionId || null) && m.project === context.project && m.projectIdentity?.device === identity.dev && m.projectIdentity?.inode === identity.ino && !['finished', 'returned', 'built'].includes(m.attachment.state));
+    const saved = resume ? this.store.read(resume) : null;
+    if (saved && saved.meta.project !== context.project) throw new Fault('Saved notes belong to a different target.', 409);
+    const existing = this.store.list().find(m => (!resume || m.id === resume) && m.attachment?.owner === owner && (m.attachment.nativeSessionId || null) === (nativeSessionId || null) && m.project === context.project && m.projectIdentity?.device === identity.dev && m.projectIdentity?.inode === identity.ino && !['finished', 'returned', 'built'].includes(m.attachment.state));
     if (existing) {
       const s = this.store.read(existing.id);
-      if (['paused', 'disconnected'].includes(s.meta.attachment.state)) { s.meta.attachment.state = 'attached'; s.meta.status = 'attached'; s.meta.error = null; delete s.meta.promptRequest; this.store.setMeta(s.id, s.meta); }
+      if (['paused', 'disconnected'].includes(s.meta.attachment.state)) { s.meta.attachment.state = 'attached'; s.meta.status = 'attached'; s.meta.error = null; delete s.meta.promptRequest; }
+      s.meta.attachment.selection = context.selection; this.store.setMeta(s.id, s.meta);
       return { ...this.snapshot(s), reopened: true };
     }
     let s;
     if (resume) {
-      s = this.store.read(resume);
-      if (s.meta.project !== context.project) throw new Fault('Saved notes belong to a different target.', 409);
+      s = saved;
       if (s.meta.attachment && !['disconnected', 'paused', 'finished', 'returned', 'built'].includes(s.meta.attachment.state)) throw new Fault('Saved notes still have a live native owner.', 409);
       if (this.app.active?.id === resume) throw new Fault('Pause the standalone interviewer before resuming its notes.', 409);
       this.store.append(s.id, 'Attachment resumed', 'Saved notes resumed by a new native connection. Prior conversation continuity and Build authorization are not assumed.');

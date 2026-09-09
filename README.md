@@ -9,6 +9,13 @@ interview. No title/path/backend form is required. The agent publishes explanati
 and questions there; you can answer freely, choose an option, or ask it to help you
 think through a question. Double-click the interview title to rename it.
 
+You can also ask the same native agent to interview another local project. It
+selects that project's directory explicitly; your terminal does not need to move
+or restart. Each project retains its own session and working prompt. Returning to
+the first project restores that interview, and an explicit saved session ID selects
+those exact notes. The browser shows the selected target. Selection never authorizes
+Build, and approval for one target or prompt cannot authorize another.
+
 ## From discussion to execution
 
 **Continue / Send answer** submits your reviewed answer to the original conversation.
@@ -88,12 +95,24 @@ Default private storage is `~/.local/share/relentless/`:
 - `preferences.json`: explicitly reviewed personal preferences.
 - `install/`, `install-bridge/`, `upgrade-backups/`: private rollback material.
 
+For a requested portfolio workflow, the master agent can keep its compact ledger
+in an existing private coordination session's Markdown, published through the native
+bridge. That session has no working execution prompt, interview question or Build
+authority. The ledger indexes project evidence, decisions, sessions, prompt revisions, authorization
+receipts, running workers/processes, results and next actions. It is a resumption
+note, not a second working prompt or a source of execution authority. It is never
+automatically copied to project interviews, helpers or workers, and it does not
+schedule or supervise processes. An ordinary owner-only Markdown index under this
+data directory is an optional alternative. Keep real portfolio content outside this checkout.
+
 Markdown is editable externally; keep the section markers intact. Conflicts retain
 both versions. Browser refresh retains unsent writing. As with ordinary editors,
 an external writer can race the final check-to-rename interval; this is not a
 transactional filesystem or power-loss guarantee. A crash never automatically
 replays Build. Inspect uncertain execution in the native client and deliberately
-resume notes. Two projects, worktrees or native connections do not share ownership.
+resume notes. One native connection may own separate project/worktree attachments;
+their context, prompts and Build controls remain separate. Other native connections
+cannot operate those live attachments.
 
 The service binds loopback and checks authenticated capabilities, Host and Origin.
 Markdown is sanitized and remote images are disabled. The browser cannot impersonate
