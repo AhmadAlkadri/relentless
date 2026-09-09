@@ -12,6 +12,13 @@ export function codexTextChunk(stream, itemId, delta) {
   const chunk = (stream.text && stream.lastItem !== itemId ? '\n\n' : '') + delta;
   stream.lastItem = itemId; stream.text += chunk; return chunk;
 }
+export function codexCompletedText(messages) {
+  const completed = [...messages].filter(item => item.type === 'agentMessage');
+  const final = completed.filter(item => item.phase === 'final_answer').at(-1);
+  const text = final?.text ?? completed.map(item => item.text).join('\n\n');
+  if (!text) throw new Error('Codex completed without a final message. Streamed output remains in recovery.');
+  return text;
+}
 export class CodexRPC {
   constructor(cwd, config = {}) {
     this.sequence = 0; this.pending = new Map(); this.onEvent = () => {}; this.onRequest = async () => ({ decision: 'decline' });
@@ -28,7 +35,7 @@ export class CodexRPC {
     });
     const ended = e => { for (const p of this.pending.values()) { clearTimeout(p.timer); p.reject(new Error(e?.message || 'Codex App Server exited. Request state may be uncertain.')); } this.pending.clear(); this.onExit?.(); };
     this.child.on('error', ended); this.child.on('exit', ended);
-    this.ready = this.request('initialize', { clientInfo: { name: 'relentless', version: '0.1.0' }, capabilities: { experimentalApi: true, requestAttestation: false } }).then(() => this.send({ method: 'initialized', params: {} }));
+    this.ready = this.request('initialize', { clientInfo: { name: 'relentless', version: '0.2.0' }, capabilities: { experimentalApi: true, requestAttestation: false } }).then(() => this.send({ method: 'initialized', params: {} }));
   }
   send(m) { if (!this.child.stdin.destroyed) this.child.stdin.write(JSON.stringify(m) + '\n'); }
   request(method, params = {}) { return new Promise((resolve, reject) => { const id = ++this.sequence; const timer = setTimeout(() => { this.pending.delete(id); reject(new Error(`Codex ${method} timed out; do not blindly retry a turn.`)); }, 60000); this.pending.set(id, { resolve, reject, timer }); this.send({ id, method, params }); }); }
@@ -54,7 +61,7 @@ export function codexConfig(project, mode) {
 export async function runCodex(opts) {
   const { cwd, mode, prompt, system, providerId, emit, interact, signal, saveId } = opts;
   const rpc = new CodexRPC(cwd, codexConfig(cwd, mode)); let turnId, threadId, settled = false;
-  const stream = { text: '', lastItem: null }, seenMessages = new Set();
+  const stream = { text: '', lastItem: null }, seenMessages = new Set(), completedMessages = new Map();
   try {
     await rpc.ready;
     const servers = await rpc.request('mcpServerStatus/list', {});
@@ -75,8 +82,14 @@ export async function runCodex(opts) {
         const p = m.params || {}; if (p.threadId && p.threadId !== threadId) return;
         if (m.method === 'turn/started') { turnId = p.turn.id; emit({ type: 'turn', id: turnId }); }
         if (m.method === 'item/agentMessage/delta') { seenMessages.add(p.itemId); emit({ type: 'delta', text: codexTextChunk(stream, p.itemId, p.delta) }); }
-        if (m.method === 'item/completed' && p.item?.type === 'agentMessage' && !seenMessages.has(p.item.id)) { seenMessages.add(p.item.id); emit({ type: 'delta', text: codexTextChunk(stream, p.item.id, p.item.text) }); }
-        if (m.method === 'turn/completed') finish(p.turn.status === 'failed' ? new Error(p.turn.error?.message || 'Codex turn failed') : null);
+        if (m.method === 'item/completed' && p.item?.type === 'agentMessage') {
+          completedMessages.set(p.item.id, p.item);
+          if (!seenMessages.has(p.item.id)) { seenMessages.add(p.item.id); emit({ type: 'delta', text: codexTextChunk(stream, p.item.id, p.item.text) }); }
+        }
+        if (m.method === 'turn/completed') {
+          for (const item of p.turn.items || []) if (item.type === 'agentMessage') completedMessages.set(item.id, item);
+          finish(p.turn.status === 'failed' ? new Error(p.turn.error?.message || 'Codex turn failed') : null);
+        }
         if (m.method === 'error') emit({ type: 'notice', text: p.error?.message || 'Provider error' });
       };
       rpc.onRequest = async m => {
@@ -101,7 +114,9 @@ export async function runCodex(opts) {
       if (signal.aborted) { cancel(); return; }
       rpc.request('turn/start', { threadId, input: [{ type: 'text', text: prompt, text_elements: [] }], effort: 'xhigh', permissions: 'relentless', approvalPolicy: mode === 'build' ? 'on-request' : 'never' }).then(r => { turnId = r.turn.id; }).catch(finish);
     });
-    return { text: stream.text, providerId: threadId };
+    // Deltas may include an abandoned/replaced draft. Only native completed
+    // messages define the saved answer; the original stream stays in recovery.
+    return { text: codexCompletedText(completedMessages.values()), providerId: threadId };
   } finally { rpc.close(); }
 }
 

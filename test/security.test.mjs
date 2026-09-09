@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
 import { startServer } from '../src/server.mjs';
-import { safeClaudePath, codexConfig, codexTextChunk } from '../src/providers.mjs';
+import { safeClaudePath, codexConfig, codexTextChunk, codexCompletedText } from '../src/providers.mjs';
 import { replaceSection, renderDocument, parseDocument } from '../src/storage.mjs';
 
 test('server rejects unauthenticated, cross-origin, wrong-host, and traversal requests', async () => {
@@ -54,4 +54,14 @@ test('Codex streamed message boundaries preserve readable paragraphs', () => {
   assert.equal(codexTextChunk(stream, 'commentary', ' now.'), ' now.');
   assert.equal(codexTextChunk(stream, 'final', 'The scope is ready.'), '\n\nThe scope is ready.');
   assert.equal(stream.text, 'Inspecting now.\n\nThe scope is ready.');
+});
+test('native final message replaces an abandoned streamed Tune draft before Markdown storage', () => {
+  const partial = 'Draft proposal\n```relentless-tune\n[{"before":"When';
+  const final = 'No change justified.\n\n```relentless-tune\n[]\n```';
+  const stream = { text: '', lastItem: null };
+  codexTextChunk(stream, 'abandoned', partial); codexTextChunk(stream, 'final', final);
+  const text = codexCompletedText([{ type: 'agentMessage', id: 'final', phase: 'final_answer', text: final }]);
+  assert.equal(text, final); assert.ok(stream.text.includes(partial));
+  assert.equal(parseDocument(renderDocument('Fixture', { conversation: text })).conversation, final);
+  assert.throws(() => codexCompletedText([]), /without a final message/);
 });
