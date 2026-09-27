@@ -53,9 +53,12 @@ relentless doctor
 
 The installer changes user-scope client configuration: it symlinks the
 `relentless`, `tune` and `sprint-prompt` skills into `~/.claude/skills` and
-`~/.agents/skills`, registers one `relentless` MCP server with each client, and links
-`~/.local/bin/relentless`, which must be on your `PATH`. It keeps backups and
-refuses conflicting edits; `relentless uninstall` rolls it back. Restart
+`~/.agents/skills` (plus `~/.codex/skills/sprint-prompt`), registers one
+`relentless` MCP server with each client, and links `~/.local/bin/relentless`, which
+must be on your `PATH`. It keeps backups and refuses conflicting edits;
+`relentless uninstall` rolls it back. `relentless doctor` prints client versions,
+authentication status and link diagnostics; it does not fail when a client is
+missing, so read its output. Restart
 already-running clients once, then invoke the skill as above. See
 [Install, update and rollback](#install-update-and-rollback) for details.
 
@@ -252,6 +255,9 @@ interviews just to undo links.
 `npm test` and `npm run check` cover deterministic state, permission, storage and
 installation contracts. Opt-in scripts use real authenticated clients and fresh
 browser contexts with disposable projects:
+
+The browser scripts use Playwright's Chromium; run `npx playwright install chromium`
+once if it is not already installed.
 
 ```sh
 node scripts/attached-live.mjs codex 135

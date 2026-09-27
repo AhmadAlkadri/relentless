@@ -635,3 +635,18 @@ browser requests, and refuses to capture if visible text contains the real user
 name, home path, store path or capabilities. The committed PNG was losslessly
 recompressed with zopflipng. It was inspected on its own and inside the rendered
 README before acceptance.
+
+Clean-clone check (local clone of the release candidate; the public URL could not
+be cloned while private): `npm ci` added 112 packages with zero vulnerabilities;
+`npm test` 88/88 passed with isolated `HOME`, `RELENTLESS_HOME`, `CODEX_HOME` and
+`CLAUDE_CONFIG_DIR`; `npm run check` and `npm audit --omit=dev` passed. In an
+`env -i` temporary home with seeded synthetic client configuration, install
+dry-run, install, repeat install, doctor, uninstall dry-run and uninstall succeeded;
+both seeded configuration files were restored byte-identically. Real client
+configuration, skill directories and launcher were hashed before and after and
+were unchanged. README links and documented flags resolved. `doctor` does not
+fail when clients are absent, Playwright's Chromium must be installed separately
+for browser scripts, and the installer's `~/.codex/skills/sprint-prompt` link
+was undocumented in the README; the README now states all three. The regenerated
+screenshot matched dimensions and differed only in minor pixel shading before
+recompression. Tested on Node 25.2.1, not on the 22.12 minimum.
