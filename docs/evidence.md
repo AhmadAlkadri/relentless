@@ -601,3 +601,28 @@ Safari inspection remained unavailable: both the existing app handle and a fresh
 app selection returned `cgWindowNotFound`. Thus live service activation and
 synthetic Chromium rendering are verified; visibility in the user's Safari window
 is not claimed. No user drafts were edited or submitted during live activation.
+
+## Public release audit (2026-09-27)
+
+The repository was reviewed again before changing GitHub visibility from private
+to public. History has 18 commits on one branch, and no path was ever tracked outside
+HEAD. Secret values, if any had been found, would not be reproduced here.
+
+- gitleaks 8.30.1 (`git --log-opts=--all`, tracked-file `dir`, full working tree):
+  zero findings in each scan.
+- trufflehog 3.97.9 (`git`, tracked-file `filesystem`, no verification): zero
+  verified or unverified findings.
+- Manual review of `git log -p --all` and HEAD for key/token prefixes,
+  Authorization headers, cookies, passwords, private keys, emails, IP addresses,
+  UUIDs, absolute paths and personal content. Header code uses runtime values only;
+  test credentials are named sentinels. No binaries, screenshots, browser state,
+  transcripts or raw sessions are tracked now or in history.
+- Accepted as non-sensitive: commit author email; provider session identifiers
+  from synthetic live runs recorded above (unusable without the account); tool
+  versions and login types; a macOS per-user temporary directory; names of two
+  other personal skills in skill provenance.
+- Dependencies: none are vendored. Installed packages are MIT, ISC, BSD, Apache-2.0,
+  Unlicense or MPL-2.0/Apache-2.0, except `@anthropic-ai/claude-agent-sdk`, which is
+  proprietary to Anthropic and installed from npm under its own terms. KaTeX is
+  served at runtime from `node_modules`.
+- `.gitignore` now also excludes `*.pem`, `*.key` and `*.p12`.

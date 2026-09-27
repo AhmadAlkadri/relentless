@@ -23,3 +23,18 @@ Remaining live-validation limit: unattended interactive Claude launches did not
 reach the bridge. Full human-operated WezTerm helper discussion/return is not
 certified. This does not replace the successful native CLI/browser, background-task,
 helper resumption, pane activation and deterministic recovery evidence.
+
+# Public release (2026-09-27)
+
+Bounded release pass: make the existing private repository public without new
+product scope. One orchestrator and one slice executor at a time.
+
+- [x] Reconnaissance: single `main` branch, local equals origin, no PRs, issues,
+      releases, wiki or Actions runs; no path ever tracked outside HEAD
+- [x] Publication safety audit of tree and full history; minimal `.gitignore` hardening
+- [ ] License and public metadata
+- [ ] README first-contact pass
+- [ ] Synthetic workflow screenshot, inspected after rendering
+- [ ] Clean-clone public-user smoke test
+- [ ] Independent release review, full checks, clean tree
+- [ ] Push, change visibility, inspect public page
