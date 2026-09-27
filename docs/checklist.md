@@ -34,7 +34,7 @@ product scope. One orchestrator and one slice executor at a time.
 - [x] Publication safety audit of tree and full history; minimal `.gitignore` hardening
 - [x] License and public metadata: MIT (own code, no vendored or copyleft
       dependencies); package metadata; npm `private` retained
-- [ ] README first-contact pass
+- [x] README first-contact pass: purpose, status, workflow, try-it, limitations
 - [ ] Synthetic workflow screenshot, inspected after rendering
 - [ ] Clean-clone public-user smoke test
 - [ ] Independent release review, full checks, clean tree

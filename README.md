@@ -1,5 +1,85 @@
 # Relentless
 
+Relentless is an experimental human-in-the-loop workspace for turning extended
+conversations with coding agents (Claude Code, Codex) into reviewed, explicitly
+authorized execution prompts. It is a local browser interview page attached, via an
+MCP bridge, to the native CLI conversation you already have open.
+
+> **Status:** Experimental research prototype. Relentless is functional and tested,
+> but it is not currently my primary development workflow. It is a personal tool,
+> developed and verified on the author's macOS setup.
+
+<!-- screenshot: docs/images/relentless-workflow.png -->
+
+## Why
+
+Long agent conversations blur discussion and execution: it becomes unclear what was
+agreed and when the agent should start changing code. Relentless keeps the agent
+interviewing you in a local browser page, keeps an editable Markdown record of the
+context, and hands back an exact reviewed prompt only when you click Build.
+Execution authority comes only from a deliberate user control, never from document
+content.
+
+## Workflow
+
+1. Inside a project, invoke `/relentless` in Claude Code or `$relentless` in Codex.
+2. A browser interview for that project opens. The same native agent publishes
+   explanations and questions there.
+3. Answer, choose options and edit the context (brief, decisions, facts,
+   assumptions, open questions) kept in private Markdown.
+4. Click **Print** to see the working execution prompt, then review or edit it.
+5. Click **Build agreed scope** to return that exact prompt revision to the
+   original CLI conversation, which executes it with its normal permissions. Or
+   click **Return to terminal** to finish without authorizing anything.
+
+## Try it
+
+Requirements: Node 22.12 or later, and an installed, authenticated Claude Code
+and/or Codex CLI. WezTerm is optional; it adds terminal tab and pane-focus controls.
+
+```sh
+git clone https://github.com/AhmadAlkadri/relentless.git
+cd relentless
+npm ci
+node scripts/install.mjs --dry-run
+node scripts/install.mjs
+relentless doctor
+```
+
+The installer changes user-scope client configuration: it symlinks the
+`relentless`, `tune` and `sprint-prompt` skills into `~/.claude/skills` and
+`~/.agents/skills`, registers one `relentless` MCP server with each client, and links
+`~/.local/bin/relentless`, which must be on your `PATH`. It keeps backups and
+refuses conflicting edits; `relentless uninstall` rolls it back. Restart
+already-running clients once, then invoke the skill as above. See
+[Install, update and rollback](#install-update-and-rollback) for details.
+
+## Limitations
+
+- Native tools outside the bridge keep their normal permissions. Interview-only
+  behavior there is skill guidance, not a sandbox.
+- The loopback service checks capabilities, Host and Origin, but does not protect
+  against malicious software running as your OS user.
+- Session storage is private (owner-only) but not encrypted.
+- Full human-operated WezTerm helper discussion/return is not certified end to end.
+- Behavioral evaluations with synthetic fixtures do not establish subjective
+  quality or universal model judgment.
+- Personal tool, tested only on the author's macOS setup with specific client
+  versions (see [compatibility](docs/compatibility.md)).
+
+## Documentation
+
+- [docs/evidence.md](docs/evidence.md): exact verification results and limitations.
+- [docs/compatibility.md](docs/compatibility.md): native client contracts.
+- [docs/skill-provenance.md](docs/skill-provenance.md): installed skill provenance
+  and rollback.
+- [docs/checklist.md](docs/checklist.md): implementation and release checklist.
+- License: [MIT](LICENSE).
+
+---
+
+## Attached interview
+
 A temporary interview sidecar for the native Claude Code or Codex conversation you
 already have open. Your original agent remains the interviewer and executor.
 
@@ -140,15 +220,9 @@ project-file handoff workflow. Relentless Print does not invoke it implicitly.
 
 ## Install, update and rollback
 
-Requires Node 22.12+, WezTerm for terminal tab/focus controls, and installed authenticated
-native clients. From this existing checkout:
-
-```sh
-npm ci
-node scripts/install.mjs --dry-run
-node scripts/install.mjs
-relentless doctor
-```
+Requires Node 22.12+ and installed authenticated native clients; WezTerm is optional
+for terminal tab/focus controls. Install commands are listed under
+[Try it](#try-it).
 
 The installer verifies canonical skill links and adds one **user-scope** MCP server
 to each client. It preserves unrelated servers, permissions and configuration.
