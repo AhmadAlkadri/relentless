@@ -533,8 +533,7 @@ Verification performed by the implementation worker:
 - `node scripts/compose-browser.mjs`: **12/12 passed**, exit 0. Final report
   `relentless-compose-browser-Xj4l1r/report.json`, with detailed sanitized-render
   observations in `render-security.json`. Reports and screenshots are retained
-  under the macOS temporary directory
-  `/private/var/folders/gp/3clyhj4s45x6bqgx6ym6978c0000gn/T/`.
+  under the macOS per-user temporary directory.
 - Browser assertions cover exact norm/subscript/matrix/integral TeX annotations
   for all four delimiter styles; ordinary Markdown; escaped delimiters, inline,
   fenced, indented and raw HTML code; invalid formulas; isolated macros and bounded

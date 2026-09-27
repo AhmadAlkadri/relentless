@@ -26,9 +26,10 @@ content.
 3. Answer, choose options and edit the context (brief, decisions, facts,
    assumptions, open questions) kept in private Markdown.
 4. Click **Print** to see the working execution prompt, then review or edit it.
-5. Click **Build agreed scope** to return that exact prompt revision to the
-   original CLI conversation, which executes it with its normal permissions. Or
-   click **Return to terminal** to finish without authorizing anything.
+5. Once the prompt is ready, click **Build agreed scope** to return that exact
+   prompt revision to the original CLI conversation, which executes it with its
+   normal permissions. Or click **Return to terminal** to finish without
+   authorizing anything.
 
 <p align="center">
   <img src="docs/images/relentless-workflow.png" width="720"
@@ -69,11 +70,14 @@ already-running clients once, then invoke the skill as above. See
 - The loopback service checks capabilities, Host and Origin, but does not protect
   against malicious software running as your OS user.
 - Session storage is private (owner-only) but not encrypted.
-- Full human-operated WezTerm helper discussion/return is not certified end to end.
+- Full human-operated WezTerm helper discussion/return is not certified end to end;
+  unattended interactive Claude launches did not reach the bridge in testing.
 - Behavioral evaluations with synthetic fixtures do not establish subjective
   quality or universal model judgment.
 - Personal tool, tested only on the author's macOS setup with specific client
-  versions (see [compatibility](docs/compatibility.md)).
+  versions (see [compatibility](docs/compatibility.md)). Recent verification ran
+  on Node 25; 22.12 is the declared minimum, not a tested one.
+  [evidence.md](docs/evidence.md) lists every known limit.
 
 ## Documentation
 
@@ -253,11 +257,11 @@ interviews just to undo links.
 ## Verification
 
 `npm test` and `npm run check` cover deterministic state, permission, storage and
-installation contracts. Opt-in scripts use real authenticated clients and fresh
-browser contexts with disposable projects:
+installation contracts. The browser scripts use Playwright's Chromium; run
+`npx playwright install chromium` once if it is not already installed.
 
-The browser scripts use Playwright's Chromium; run `npx playwright install chromium`
-once if it is not already installed.
+Opt-in scripts use real authenticated clients and fresh browser contexts with
+disposable projects:
 
 ```sh
 node scripts/attached-live.mjs codex 135
