@@ -32,7 +32,8 @@ product scope. One orchestrator and one slice executor at a time.
 - [x] Reconnaissance: single `main` branch, local equals origin, no PRs, issues,
       releases, wiki or Actions runs; no path ever tracked outside HEAD
 - [x] Publication safety audit of tree and full history; minimal `.gitignore` hardening
-- [ ] License and public metadata
+- [x] License and public metadata: MIT (own code, no vendored or copyleft
+      dependencies); package metadata; npm `private` retained
 - [ ] README first-contact pass
 - [ ] Synthetic workflow screenshot, inspected after rendering
 - [ ] Clean-clone public-user smoke test

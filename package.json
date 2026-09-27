@@ -3,7 +3,12 @@
   "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "A local Markdown space for thinking with agents",
+  "description": "Experimental human-in-the-loop interview workspace for turning coding-agent conversations into reviewed, explicitly authorized execution prompts",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AhmadAlkadri/relentless.git"
+  },
   "bin": {
     "relentless": "bin/relentless.mjs"
   },
