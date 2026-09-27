@@ -40,4 +40,5 @@ product scope. One orchestrator and one slice executor at a time.
 - [x] Clean-clone public-user smoke test: npm ci, tests, check, audit, isolated
       install/doctor/uninstall, links; README gaps fixed
 - [x] Independent release review (no blockers; wording nits fixed), full checks, clean tree
-- [ ] Push, change visibility, inspect public page
+- [x] Pushed `ac49177`, visibility changed to public, public page, README image,
+      raw files and anonymous clone verified; no npm publication
