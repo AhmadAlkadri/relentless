@@ -35,7 +35,8 @@ product scope. One orchestrator and one slice executor at a time.
 - [x] License and public metadata: MIT (own code, no vendored or copyleft
       dependencies); package metadata; npm `private` retained
 - [x] README first-contact pass: purpose, status, workflow, try-it, limitations
-- [ ] Synthetic workflow screenshot, inspected after rendering
+- [x] Synthetic workflow screenshot (`scripts/readme-screenshot.mjs`, isolated
+      storage, providers stubbed), inspected standalone and in rendered README
 - [ ] Clean-clone public-user smoke test
 - [ ] Independent release review, full checks, clean tree
 - [ ] Push, change visibility, inspect public page

@@ -626,3 +626,12 @@ HEAD. Secret values, if any had been found, would not be reproduced here.
   proprietary to Anthropic and installed from npm under its own terms. KaTeX is
   served at runtime from `node_modules`.
 - `.gitignore` now also excludes `*.pem`, `*.key` and `*.p12`.
+
+`docs/images/relentless-workflow.png` is a real capture of the attached browser UI
+for a synthetic `tidy-notes` project. `scripts/readme-screenshot.mjs` isolates
+`HOME` and `RELENTLESS_HOME` in a temporary directory, replaces provider, helper and
+terminal functions with throwing stubs (zero calls asserted), blocks non-local
+browser requests, and refuses to capture if visible text contains the real user
+name, home path, store path or capabilities. The committed PNG was losslessly
+recompressed with zopflipng. It was inspected on its own and inside the rendered
+README before acceptance.
